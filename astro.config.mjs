@@ -17,8 +17,10 @@ export default defineConfig({
   // 後台 session 走 D1（docs/08-security.md），不需要 Astro 的 session API。
   session: false,
 
-  // TODO: 正式網域確定後填入，sitemap 與 canonical 會用到
-  // site: 'https://example.com',
+  // canonical 與 sitemap 的基準網址。
+  // 必須固定成正式網址 —— 若留空會回退成請求的來源，導致 apex、www、
+  // workers.dev 各自宣告自己是 canonical，對搜尋引擎變成重複內容。
+  site: 'https://www.tsurumarucorp.com',
 
   // 前台 markup 與樣式原樣沿用舊站（紅線一，見 docs/04-conventions.md）。
   // theme.css 與 vendor 資產放在 public/ 直接送出，不經 Vite 處理。

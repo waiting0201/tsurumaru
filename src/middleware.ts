@@ -27,8 +27,26 @@ const DETAIL: Record<string, string> = {
 
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
+/** 正式主機名。其他主機名（apex、舊網域）一律 301 導到這裡 */
+const CANONICAL_HOST = 'www.tsurumarucorp.com';
+/** 這些主機名不導轉：本機開發與 workers.dev 預覽仍要能直接使用 */
+const NO_REDIRECT = /^(localhost|127\.0\.0\.1|\[?::1\]?|.*\.workers\.dev)$/i;
+
 export const onRequest = defineMiddleware(async (context, next) => {
   const url = context.url;
+
+  // apex → www。避免 apex 與 www 各自被索引成重複內容。
+  // workers.dev 不導轉，但它的 canonical 會指向正式網址（astro.config 的 site），
+  // 所以不會造成重複內容問題。
+  const host = url.hostname;
+  if (host !== CANONICAL_HOST && !NO_REDIRECT.test(host)) {
+    const target = new URL(url);
+    target.hostname = CANONICAL_HOST;
+    target.protocol = 'https:';
+    target.port = '';
+    return context.redirect(target.toString(), 301);
+  }
+
   const path = url.pathname.toLowerCase().replace(/\/+$/, '') || '/';
 
   // 舊後台一律導到新後台登入頁；深層網址不需要保留
