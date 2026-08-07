@@ -30,6 +30,13 @@ export async function getObject(key: string) {
   return env.BUCKET.get(key);
 }
 
+/**
+ * 物件的快取標頭。R2 自訂網域是把物件存的 httpMetadata 原樣送出 ——
+ * 沒設就完全不會被快取（cf-cache-status: DYNAMIC），每次瀏覽都回源。
+ * 檔名是時間戳記、內容不會就地改寫，所以可以安全地用 immutable 長快取。
+ */
+export const OBJECT_CACHE_CONTROL = 'public, max-age=31536000, immutable';
+
 /** 後台上傳：檔名重新產生，不沿用使用者輸入。見 docs/08-security.md#輸入處理 */
 export async function putVehiclePhoto(
   vehicleId: string,
@@ -38,7 +45,9 @@ export async function putVehiclePhoto(
   contentType: string,
 ): Promise<void> {
   const key = `vehicles/${vehicleId.toLowerCase()}/${filename}`;
-  await env.BUCKET.put(key, body, { httpMetadata: { contentType } });
+  await env.BUCKET.put(key, body, {
+    httpMetadata: { contentType, cacheControl: OBJECT_CACHE_CONTROL },
+  });
 }
 
 export async function deleteVehiclePhoto(vehicleId: string, filename: string): Promise<void> {

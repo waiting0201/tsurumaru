@@ -81,15 +81,24 @@ if (!doUpload) {
   process.exit(missingFile.length ? 1 : 0);
 }
 
+// R2 自訂網域把物件存的 metadata 原樣送出。沒設 cache-control 的話
+// cf-cache-status 會是 DYNAMIC，每次瀏覽都回源 —— 必須跟著上傳一起設。
+// 與 src/lib/media.ts 的 OBJECT_CACHE_CONTROL 保持一致。
+const CACHE_CONTROL = 'public, max-age=31536000, immutable';
+const MIME = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp' };
+
 const target = remote ? '正式 R2' : '本地模擬';
 console.log(`\n上傳到 ${target}…`);
 let ok = 0;
 for (const [key, path] of onDisk) {
   if (!inDb.has(key)) continue;                       // 孤兒檔案不上傳
   const objectKey = `vehicles/${key}`;                // key 已正規化為小寫
+  const ext = (key.match(/\.([A-Za-z0-9]+)$/)?.[1] ?? '').toLowerCase();
   execFileSync('npx', [
     'wrangler', 'r2', 'object', 'put', `${BUCKET}/${objectKey}`,
     '--file', path, remote ? '--remote' : '--local',
+    '--cache-control', CACHE_CONTROL,
+    ...(MIME[ext] ? ['--content-type', MIME[ext]] : []),
   ], { cwd: ROOT, stdio: ['ignore', 'ignore', 'inherit'] });
   console.log(`  ✅ ${objectKey}`);
   ok++;
