@@ -7,21 +7,26 @@ interface Props {
   /** 不含 query 的路徑，例如 /admin/vehicles */
   base: string;
   current: number;
+  /**
+   * 這個管理員有權讀取的車種（auth.ts viewableTypes）。只有一種時整組
+   * 切換器就不出現 —— 顯示一個按下去會 403 的頁籤沒有意義。
+   */
+  types: number[];
 }
 
-const { base, current } = Astro.props;
-const tabs = [
-  { type: VEHICLE_TYPE.CAR, label: '汽車' },
-  { type: VEHICLE_TYPE.BIKE, label: '機車' },
-];
+const { base, current, types } = Astro.props;
+const LABEL: Record<number, string> = { [VEHICLE_TYPE.CAR]: '汽車', [VEHICLE_TYPE.BIKE]: '機車' };
+const tabs = [VEHICLE_TYPE.CAR, VEHICLE_TYPE.BIKE].filter((t) => types.includes(t));
 ---
 
-<div class="tm-scope" role="group" aria-label="車種">
-  {
-    tabs.map((t) => (
-      <a href={`${base}?type=${t.type}`} aria-current={current === t.type ? 'page' : undefined}>
-        {t.label}
-      </a>
-    ))
-  }
-</div>
+{
+  tabs.length > 1 && (
+    <div class="tm-scope" role="group" aria-label="車種">
+      {tabs.map((t) => (
+        <a href={`${base}?type=${t}`} aria-current={current === t ? 'page' : undefined}>
+          {LABEL[t]}
+        </a>
+      ))}
+    </div>
+  )
+}

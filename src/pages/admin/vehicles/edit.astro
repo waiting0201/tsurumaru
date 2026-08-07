@@ -9,8 +9,8 @@ import Admin from '../../../layouts/Admin.astro';
 import Panel from '../../../components/admin/Panel.astro';
 import Flash from '../../../components/admin/Flash.astro';
 import Field from '../../../components/admin/Field.astro';
-import { requireView, requireCan, requirePost, handleGuard, str, int } from '../../../lib/admin-guard';
-import { csrfToken, RESOURCES } from '../../../lib/auth';
+import { requireViewType, requireCanType, requirePost, handleGuard, str, int } from '../../../lib/admin-guard';
+import { csrfToken } from '../../../lib/auth';
 import { getVehicleRow, insertVehicle, updateVehicle, modelsForType } from '../../../lib/admin-db';
 import {
   putVehiclePhoto, deleteVehiclePhoto, newPhotoFilename,
@@ -28,13 +28,14 @@ let admin, csrf, models, vehicle = null;
 let err = '', msg = '';
 
 try {
-  admin = await requireView(Astro, RESOURCES.VEHICLES);
+  // 權限依車種分開，不能寫死成汽車節點（見 auth.ts resourceFor）
+  ({ admin } = await requireViewType(Astro, 'vehicles', type));
   csrf = await csrfToken(admin.sessionId);
   vehicle = editId ? await getVehicleRow(editId) : null;
   if (editId && !vehicle) return new Response('404 — 找不到該車輛。', { status: 404 });
 
   if (Astro.request.method === 'POST') {
-    await requireCan(Astro, RESOURCES.VEHICLES, vehicle ? 'update' : 'add');
+    await requireCanType(Astro, 'vehicles', type, vehicle ? 'update' : 'add');
     const form = await requirePost(Astro, admin);
 
     const modelId = int(form, 'vehicle_model_id');

@@ -7,7 +7,7 @@
 // Driveline / Fuel / Transmission / Exterior），讓既有分享連結繼續有效。
 // 見 docs/07-migration.md#篩選參數
 
-import { yearRangeToBounds } from './enums';
+import { yearRangeToBounds, YEAR_RANGES } from './enums';
 
 export interface VehicleFilters {
   k: string | null;
@@ -29,10 +29,15 @@ const num = (v: string | null): number | null => {
 
 export function parseFilters(params: URLSearchParams): VehicleFilters {
   const list = (name: string) => params.getAll(name).filter((s) => s !== '');
+  // 認不出來的 Year 代碼在這裡就丟掉，而不是留給 buildWhere 靜默略過 ——
+  // 否則「條件存在但沒有作用」，畫面顯示未篩選、結果卻是全部車輛，
+  // 使用者會以為這些車都落在他選的年份區間內。舊的分享連結若帶著已調整過
+  // 的代碼就會踩到。見 docs/03-data-model.md#年份篩選區間
+  const yearCode = params.get('Year')?.trim() || null;
   return {
     k: params.get('K')?.trim() || null,
     vehicleModelId: num(params.get('VehicleModelID')),
-    year: params.get('Year')?.trim() || null,
+    year: yearCode && YEAR_RANGES[yearCode] ? yearCode : null,
     priceFrom: num(params.get('PriceFrom')),
     priceTo: num(params.get('PriceTo')),
     driveline: list('Driveline'),

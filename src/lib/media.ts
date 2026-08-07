@@ -54,14 +54,27 @@ export async function deleteVehiclePhoto(vehicleId: string, filename: string): P
   await env.BUCKET.delete(`vehicles/${vehicleId.toLowerCase()}/${filename}`);
 }
 
-/** 產生上傳用檔名：沿用舊系統的時間戳記格式 yyyyMMddHHmmss.ext */
+/**
+ * 產生上傳用檔名：yyyyMMddHHmmss-xxxxxx.ext
+ *
+ * ⚠️ 時間戳記後面那段隨機碼是必要的，不是裝飾。
+ *    舊格式只有到秒的時間戳記（沿用舊系統），而相簿的多圖上傳是在同一個
+ *    請求裡連續處理每個檔案 —— 同一秒內跑完好幾張是常態，於是每張都拿到
+ *    一模一樣的檔名：R2 上只留下最後一張，其餘的靜默消失，但資料庫仍然
+ *    寫入多筆指向同一個物件的紀錄。接著刪掉其中任一筆，共用的物件被移除，
+ *    剩下的全部變成破圖。
+ *    見 docs/06-verification.md#相簿多圖上傳
+ */
 export function newPhotoFilename(originalName: string): string {
   const ext = (originalName.match(/\.([A-Za-z0-9]+)$/)?.[1] ?? 'jpg').toLowerCase();
   const d = new Date();
   const p = (n: number, w = 2) => String(n).padStart(w, '0');
   const stamp = `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}` +
                 `${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}`;
-  return `${stamp}.${ext}`;
+  const rand = [...crypto.getRandomValues(new Uint8Array(3))]
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+  return `${stamp}-${rand}.${ext}`;
 }
 
 /**

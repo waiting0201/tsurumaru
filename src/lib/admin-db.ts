@@ -141,6 +141,20 @@ export async function listPhotos(vehicleId: string): Promise<VehiclePhotoRow[]> 
 export const getPhoto = (id: string) =>
   db().prepare('SELECT * FROM vehicle_photos WHERE id = ?').bind(id).first<VehiclePhotoRow>();
 
+/**
+ * 下一張相片該用的 sort 值 = 目前最大值 + 5。
+ *
+ * 用 MAX 而不是「現有張數 × 5」—— 既有相片的 sort 是店員手改過的，
+ * 不保證還是 0/5/10 這種規律，用張數推算會撞到已經存在的值。
+ */
+export async function nextPhotoSort(vehicleId: string): Promise<number> {
+  const row = await db()
+    .prepare('SELECT COALESCE(MAX(sort), -5) + 5 AS next FROM vehicle_photos WHERE vehicle_id = ?')
+    .bind(vehicleId.toLowerCase())
+    .first<{ next: number }>();
+  return row?.next ?? 0;
+}
+
 export const insertPhoto = (p: VehiclePhotoRow) =>
   db().prepare('INSERT INTO vehicle_photos (id, vehicle_id, photo, title, sort) VALUES (?,?,?,?,?)')
     .bind(p.id, p.vehicle_id.toLowerCase(), p.photo, p.title, p.sort).run();

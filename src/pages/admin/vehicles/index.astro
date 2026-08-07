@@ -5,8 +5,8 @@ import Panel from '../../../components/admin/Panel.astro';
 import Flash from '../../../components/admin/Flash.astro';
 import Pager from '../../../components/admin/Pager.astro';
 import ScopeTabs from '../../../components/admin/ScopeTabs.astro';
-import { requireView, requireCan, requirePost, handleGuard, str } from '../../../lib/admin-guard';
-import { csrfToken, RESOURCES, can } from '../../../lib/auth';
+import { requireViewType, requireCanType, requirePost, handleGuard, str } from '../../../lib/admin-guard';
+import { csrfToken, can, resourceFor } from '../../../lib/auth';
 import { listVehiclesAdmin, deleteVehicle, getVehicleRow, updateSorts, listPhotos } from '../../../lib/admin-db';
 import { deleteVehiclePhoto } from '../../../lib/media';
 import { photoUrl } from '../../../lib/media';
@@ -18,19 +18,21 @@ const type = Number(Astro.url.searchParams.get('type')) === VEHICLE_TYPE.BIKE ? 
 const page = Math.max(1, Number(Astro.url.searchParams.get('p')) || 1);
 const typeName = type === VEHICLE_TYPE.CAR ? '汽車' : '機車';
 
-let admin, csrf, data, mayAdd = false, mayUpdate = false, mayDelete = false;
+let admin, csrf, data, types: number[] = [], mayAdd = false, mayUpdate = false, mayDelete = false;
 let msg = '', err = '';
 
 try {
-  admin = await requireView(Astro, RESOURCES.VEHICLES);
+  // 權限依車種分開，不能寫死成汽車節點（見 auth.ts resourceFor）
+  ({ admin, types } = await requireViewType(Astro, 'vehicles', type));
   csrf = await csrfToken(admin.sessionId);
+  const RES = resourceFor('vehicles', type);
 
   if (Astro.request.method === 'POST') {
     const form = await requirePost(Astro, admin);
     const action = str(form, 'action');
 
     if (action === 'delete') {
-      await requireCan(Astro, RESOURCES.VEHICLES, 'delete');
+      await requireCanType(Astro, 'vehicles', type, 'delete');
       const id = str(form, 'id');
       const v = id ? await getVehicleRow(id) : null;
       if (!v) err = '找不到該車輛。';
@@ -43,7 +45,7 @@ try {
         msg = '已刪除該車輛與其所有相片。';
       }
     } else if (action === 'sort') {
-      await requireCan(Astro, RESOURCES.VEHICLES, 'update');
+      await requireCanType(Astro, 'vehicles', type, 'update');
       const ids = form.getAll('sort_id').map((v) => String(v));
       const sorts = form.getAll('sort_value').map((v) => Number(v));
       await updateSorts('vehicles', ids.map((id, i) => ({ id, sort: sorts[i] ?? 0 })));
@@ -53,9 +55,9 @@ try {
 
   [data, mayAdd, mayUpdate, mayDelete] = await Promise.all([
     listVehiclesAdmin(type, page),
-    can(admin, RESOURCES.VEHICLES, 'add'),
-    can(admin, RESOURCES.VEHICLES, 'update'),
-    can(admin, RESOURCES.VEHICLES, 'delete'),
+    can(admin, RES, 'add'),
+    can(admin, RES, 'update'),
+    can(admin, RES, 'delete'),
   ]);
 } catch (e) {
   return handleGuard(e);
@@ -71,7 +73,7 @@ const stub = (id: string) => id.slice(0, 8).toUpperCase();
 
 <Admin title={`車輛維護 — ${typeName}`} admin={admin} csrf={csrf}>
   <Fragment slot="actions">
-    <ScopeTabs base="/admin/vehicles" current={type} />
+    <ScopeTabs base="/admin/vehicles" current={type} types={types} />
     {mayAdd && <a class="tm-btn" href={`/admin/vehicles/edit?type=${type}`}>新增{typeName}</a>}
   </Fragment>
 

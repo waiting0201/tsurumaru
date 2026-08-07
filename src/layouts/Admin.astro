@@ -10,7 +10,7 @@
 // 扮演選單與權限兩種角色，職責混淆。
 //
 // 排版全程不需要 JavaScript：手機版選單用 <details>，不引入任何前端狀態。
-import type { AuthedAdmin } from '../lib/auth';
+import { canView, viewableTypes, RESOURCES, type AuthedAdmin } from '../lib/auth';
 import '../styles/admin.css';
 
 interface Props {
@@ -22,19 +22,31 @@ interface Props {
 const { title, admin, csrf } = Astro.props;
 const path = Astro.url.pathname;
 
+// 選單只列出這個帳號真的進得去的項目 —— 列一個按下去會 403 的連結，
+// 等於讓人去撞一道沒有解釋的牆。權限在這裡集中判斷一次，頁面就不用各自處理。
+// 超級管理員不會產生任何查詢（canView 直接短路）。
+const [vehicleTypes, makeTypes, modelTypes, mayViewAdmins] = await Promise.all([
+  viewableTypes(admin, 'vehicles'),
+  viewableTypes(admin, 'makes'),
+  viewableTypes(admin, 'models'),
+  canView(admin, RESOURCES.ADMINS),
+]);
+
 // code 是印在頁面抬頭的區段代號。它不是裝飾 —— 頁標題常常帶著
 // 「— 汽車」這類範圍後綴，代號讓人一眼確認自己在哪一個區段。
+// href 帶上一個有權限的車種，避免點進去才被轉走。
 const NAV = [
-  { href: '/admin', code: 'OVERVIEW', label: '總覽' },
-  { href: '/admin/vehicles', code: 'VEHICLES', label: '車輛' },
-  { href: '/admin/makes', code: 'MAKES', label: '車廠' },
-  { href: '/admin/models', code: 'MODELS', label: '車型' },
-  { href: '/admin/admins', code: 'ADMINS', label: '管理員' },
-];
+  { href: '/admin', code: 'OVERVIEW', label: '總覽', show: true },
+  { href: '/admin/vehicles', code: 'VEHICLES', label: '車輛', show: vehicleTypes.length > 0, type: vehicleTypes[0] },
+  { href: '/admin/makes', code: 'MAKES', label: '車廠', show: makeTypes.length > 0, type: makeTypes[0] },
+  { href: '/admin/models', code: 'MODELS', label: '車型', show: modelTypes.length > 0, type: modelTypes[0] },
+  { href: '/admin/admins', code: 'ADMINS', label: '管理員', show: mayViewAdmins },
+].filter((n) => n.show);
 
 const active = (href: string) => (href === '/admin' ? path === '/admin' : path.startsWith(href));
 const current = NAV.find((n) => active(n.href));
 const who = admin.name ?? admin.username;
+const navHref = (n: (typeof NAV)[number]) => (n.type ? `${n.href}?type=${n.type}` : n.href);
 ---
 
 <!doctype html>
@@ -90,7 +102,7 @@ const who = admin.name ?? admin.username;
         <nav class="pb-3 lg:flex-1 lg:pb-0" aria-label="後台主選單">
           {
             NAV.map((n) => (
-              <a class="tm-nav-link" href={n.href} aria-current={active(n.href) ? 'page' : undefined}>
+              <a class="tm-nav-link" href={navHref(n)} aria-current={active(n.href) ? 'page' : undefined}>
                 <span class="mr-2 flex-1">{n.label}</span>
                 <span class="font-mono text-[10px] tracking-[0.12em] text-rail-text/70 uppercase">{n.code}</span>
               </a>

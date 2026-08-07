@@ -4,7 +4,11 @@
 // 見 docs/08-security.md#授權
 
 import type { APIContext } from 'astro';
-import { getSessionAdmin, can, canView, checkCsrf, CSRF_FIELD, type AuthedAdmin, type ResourceKey, type Action } from './auth';
+import {
+  getSessionAdmin, can, canView, checkCsrf, CSRF_FIELD, resourceFor, viewableTypes,
+  type AuthedAdmin, type ResourceKey, type Action,
+} from './auth';
+import { VEHICLE_TYPE } from './enums';
 
 export class Redirect {
   constructor(public response: Response) {}
@@ -25,6 +29,43 @@ export async function requireView(context: APIContext, resource: ResourceKey): P
   const admin = await requireAdmin(context);
   if (!(await canView(admin, resource))) throw new Redirect(forbidden());
   return admin;
+}
+
+/**
+ * 依車種取得讀取權。車廠／車型／車輛的權限是分車種的（見 auth.ts resourceFor）。
+ *
+ * 若對指定車種沒有讀取權、但對另一個車種有，就導到那一個 —— 選單連結一律
+ * 指向汽車，只給機車權限的管理員點進來不該撞到一個沒有解釋的 403。
+ * 兩種都沒有才回 403。
+ *
+ * 回傳可用的車種清單，交給頁面決定要顯示哪些切換頁籤。
+ */
+export async function requireViewType(
+  context: APIContext,
+  kind: 'makes' | 'models' | 'vehicles',
+  type: number,
+): Promise<{ admin: AuthedAdmin; types: number[] }> {
+  const admin = await requireAdmin(context);
+  const types = await viewableTypes(admin, kind);
+  if (types.includes(type)) return { admin, types };
+  // 只有 GET 走「改導到有權限的車種」這條體貼路線。異動請求被默默轉成一個
+  // GET 會讓人以為存檔成功了，這種情況必須明確拒絕。
+  if (types.length && context.request.method === 'GET') {
+    const target = new URL(context.url);
+    target.searchParams.set('type', String(types[0]));
+    throw new Redirect(context.redirect(target.pathname + target.search, 302));
+  }
+  throw new Redirect(forbidden());
+}
+
+/** 依車種檢查異動權限 */
+export function requireCanType(
+  context: APIContext,
+  kind: 'makes' | 'models' | 'vehicles',
+  type: number,
+  action: Action,
+): Promise<AuthedAdmin> {
+  return requireCan(context, resourceFor(kind, type), action);
 }
 
 /** 需要對某資源有指定的異動權限 */

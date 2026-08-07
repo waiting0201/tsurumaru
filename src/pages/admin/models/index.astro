@@ -6,8 +6,8 @@ import Flash from '../../../components/admin/Flash.astro';
 import Field from '../../../components/admin/Field.astro';
 import Pager from '../../../components/admin/Pager.astro';
 import ScopeTabs from '../../../components/admin/ScopeTabs.astro';
-import { requireView, requireCan, requirePost, handleGuard, str, int } from '../../../lib/admin-guard';
-import { csrfToken, RESOURCES, can } from '../../../lib/auth';
+import { requireViewType, requireCanType, requirePost, handleGuard, str, int } from '../../../lib/admin-guard';
+import { csrfToken, can, resourceFor } from '../../../lib/auth';
 import { listModels, createModel, updateModel, deleteModel, modelInUse, getModelRow, allMakes, updateSorts } from '../../../lib/admin-db';
 import { VEHICLE_TYPE } from '../../../lib/enums';
 
@@ -18,31 +18,33 @@ const page = Math.max(1, Number(Astro.url.searchParams.get('p')) || 1);
 const makeFilter = Number(Astro.url.searchParams.get('make')) || null;
 const typeName = type === VEHICLE_TYPE.CAR ? '汽車' : '機車';
 
-let admin, csrf, data, makes, mayAdd = false, mayUpdate = false, mayDelete = false;
+let admin, csrf, data, makes, types: number[] = [], mayAdd = false, mayUpdate = false, mayDelete = false;
 let msg = '', err = '';
 
 try {
-  admin = await requireView(Astro, RESOURCES.MODELS);
+  // 權限依車種分開，不能寫死成汽車節點（見 auth.ts resourceFor）
+  ({ admin, types } = await requireViewType(Astro, 'models', type));
   csrf = await csrfToken(admin.sessionId);
+  const RES = resourceFor('models', type);
 
   if (Astro.request.method === 'POST') {
     const form = await requirePost(Astro, admin);
     const action = str(form, 'action');
 
     if (action === 'create') {
-      await requireCan(Astro, RESOURCES.MODELS, 'add');
+      await requireCanType(Astro, 'models', type, 'add');
       const makeId = int(form, 'make_id'), code = str(form, 'code'), title = str(form, 'title');
       if (!makeId || !code || !title) err = '車廠、代碼與名稱都是必填。';
       else { await createModel(makeId, code, title, int(form, 'sort') ?? 0); msg = `已新增「${title}」。`; }
     } else if (action === 'update') {
-      await requireCan(Astro, RESOURCES.MODELS, 'update');
+      await requireCanType(Astro, 'models', type, 'update');
       const id = int(form, 'id'), makeId = int(form, 'make_id');
       const code = str(form, 'code'), title = str(form, 'title');
       if (!id || !(await getModelRow(id))) err = '找不到該車型。';
       else if (!makeId || !code || !title) err = '車廠、代碼與名稱都是必填。';
       else { await updateModel(id, makeId, code, title, int(form, 'sort') ?? 0); msg = '已更新。'; }
     } else if (action === 'delete') {
-      await requireCan(Astro, RESOURCES.MODELS, 'delete');
+      await requireCanType(Astro, 'models', type, 'delete');
       const id = int(form, 'id');
       if (!id || !(await getModelRow(id))) err = '找不到該車型。';
       else {
@@ -51,7 +53,7 @@ try {
         else { await deleteModel(id); msg = '已刪除。'; }
       }
     } else if (action === 'sort') {
-      await requireCan(Astro, RESOURCES.MODELS, 'update');
+      await requireCanType(Astro, 'models', type, 'update');
       const ids = form.getAll('sort_id').map((v) => Number(v));
       const sorts = form.getAll('sort_value').map((v) => Number(v));
       await updateSorts('vehicle_models', ids.map((id, i) => ({ id, sort: sorts[i] ?? 0 })));
@@ -62,9 +64,9 @@ try {
   [data, makes, mayAdd, mayUpdate, mayDelete] = await Promise.all([
     listModels(type, makeFilter, page),
     allMakes(type),
-    can(admin, RESOURCES.MODELS, 'add'),
-    can(admin, RESOURCES.MODELS, 'update'),
-    can(admin, RESOURCES.MODELS, 'delete'),
+    can(admin, RES, 'add'),
+    can(admin, RES, 'update'),
+    can(admin, RES, 'delete'),
   ]);
 } catch (e) {
   return handleGuard(e);
@@ -82,7 +84,7 @@ const filteredMake = makeFilter ? makes.find((m) => m.id === makeFilter) : null;
 ---
 
 <Admin title={`車型維護 — ${typeName}`} admin={admin} csrf={csrf}>
-  <ScopeTabs slot="actions" base="/admin/models" current={type} />
+  <ScopeTabs slot="actions" base="/admin/models" current={type} types={types} />
 
   <Flash err={err} msg={msg} />
 

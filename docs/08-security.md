@@ -85,12 +85,27 @@
 - 一律 **fail closed**：查不到權限設定 = 拒絕
 - 修改與刪除都必須驗證目標資源存在且該管理員有權操作
 
+🔴 **車廠／車型／車輛的權限依車種分開。** `permissions` 表對這三種資源各有汽車與機車兩個節點（`CarMakes`／`MotorMakes` 等）。ADR-0005 把頁面合併成單一頁以 `?type=` 區分，**但權限沒有合併**，一律用 `resourceFor('vehicles' | 'makes' | 'models', type)` 取得資源鍵。
+
+寫死成汽車節點會同時造成兩個方向的錯誤，而且兩者都不會有任何錯誤訊息：
+
+| 指派的權限 | 寫死汽車節點時的實際結果 |
+|---|---|
+| 只勾機車三項 | 存檔成功，但機車頁面全部 403 —— 勾了等於沒勾 |
+| 只勾「汽車維護」 | 連帶取得機車的同等權限 —— 比畫面宣告的範圍更大 |
+
+2026-08-07 的 debug 實測確認過這兩種情形，修正後已回歸驗證（見 [06-verification.md](06-verification.md) B3）。
+
+「沒有任何權限」也要一致：`/admin` 總覽頁只呼叫 `requireAdmin`，所以每個統計數字都必須自己比對 `canView`，否則資源頁面 403 但筆數照樣外洩。
+
 ### 輸入處理
 
 - SQL 一律用 prepared statement 綁參數（見 [04-conventions.md](04-conventions.md#資料存取)）
 - 所有異動操作用 POST/PUT/DELETE + CSRF token，不用 GET
 - 上傳檔案：副檔名白名單（jpg/jpeg/png/webp）、驗證 magic bytes、限制大小、**檔名重新產生**不沿用使用者輸入
 - `description` 等欄位含 HTML，輸出時若用 `set:html` 必須先淨化（後台輸入端也要限制允許的標籤）
+
+🔴 **判斷網址協定前一定要先正規化。** 瀏覽器在解析 `href` 之前會解 HTML 實體、並丟掉 URL 裡的空白與控制字元，所以只比對字面上的 `javascript:` 一定會被繞過 —— `java&#115;cript:`、`&#x6a;avascript:`、`java<TAB>script:` 都會變回可執行的 `javascript:`。`lib/sanitize.ts` 的 `normalizeUrl()` 負責這件事，改動那支檔案時不要拿掉。同時 `style` 屬性整條移除（`position:fixed` 蓋版可以劫持點擊），`data:` 只放行圖片類型。
 
 ### 祕密
 

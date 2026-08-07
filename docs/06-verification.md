@@ -79,6 +79,48 @@ ls -la dist/client/_astro/admin.*.css          # 約 32 KB；破百 KB 就是掃
 grep -c "car-finder\|jarallax" dist/client/_astro/admin.*.css   # 必須是 0
 ```
 
+### B3. 後台迴歸：三個曾經壞過的地方（動到後台時必做）
+
+2026-08-07 的全功能 debug 找出這三個缺陷，都已修好。它們的共通點是**看起來成功、實際失敗**，所以一定要用實測而不是讀程式碼來確認。
+
+**相簿多圖上傳**（`lib/media.ts` newPhotoFilename）
+
+檔名的時間戳記只到秒。同一個請求裡連續處理多個檔案會全部落在同一秒，於是每張圖拿到相同檔名 → R2 只留最後一張、資料庫卻寫入多筆指向它的紀錄 → 之後刪掉任一筆會把共用物件刪掉，剩下的全變破圖。修法是在時間戳記後面加隨機碼。
+
+```bash
+# 一次上傳 3 張，資料列數與「不同檔名數」必須相等
+npx wrangler d1 execute tsurumaru --local --command \
+  "SELECT COUNT(*) rows, COUNT(DISTINCT photo) files FROM vehicle_photos WHERE vehicle_id='<id>'"
+# 每個 sort 只能出現一次（第二批上傳要接在後面，不是從 0 重排）
+npx wrangler d1 execute tsurumaru --local --command \
+  "SELECT sort, COUNT(*) n FROM vehicle_photos WHERE vehicle_id='<id>' GROUP BY sort"
+```
+
+**權限依車種分開**（`lib/auth.ts` resourceFor）
+
+`permissions` 表的車廠／車型／車輛各有汽車與機車兩個節點。頁面在 ADR-0005 合併成一頁以 `?type=` 區分，但**權限沒有跟著合併** —— 曾經寫死成汽車節點，導致「只給機車權限」完全無效、「只給汽車權限」卻連帶開放機車。
+
+🔴 新增任何依車種的後台頁面時，一律用 `resourceFor('vehicles' | 'makes' | 'models', type)`，不可寫死 `RESOURCES.VEHICLES`。
+
+```bash
+# 建一個一般管理員，只給機車三個節點（permission id 6,7,9），預期：
+#   GET  /admin/vehicles?type=2 → 200
+#   GET  /admin/vehicles?type=1 → 302 轉到 type=2（不是 403，選單一律指向汽車）
+# 只給汽車節點（id 8），預期：
+#   GET  ?type=2 → 302 轉回 type=1
+#   POST ?type=2 → 403（異動不做體貼轉址，默默轉成 GET 會讓人以為存檔成功）
+```
+
+**描述欄位的淨化**（`lib/sanitize.ts`）
+
+`javascript:` 的比對必須先把 HTML 實體解碼、並拔掉 scheme 裡的空白字元，否則 `java&#115;cript:`、`&#x6a;avascript:`、`java<TAB>script:` 全都能通過而瀏覽器照樣執行。`style` 屬性整條移除。`data:` 只放行圖片。
+
+```bash
+# 把這串存進某台車的「詳細說明」，再看前台詳情頁的輸出
+ZZBEGIN<a href="java&#115;cript:alert(1)">x</a><div style="position:fixed;inset:0">y</div>ZZEND
+# 預期：<a>x</a><div>y</div> —— href 與 style 整條消失，標籤與文字保留
+```
+
 ### C. 視覺比對（有舊站可比時必做）
 
 若舊站仍在線上，在相同視窗寬度（至少 375 / 768 / 1440）逐頁截圖比對：首頁、汽車列表（含篩選展開）、汽車詳情（含相簿燈箱）、機車三頁、關於／地圖／隱私權。

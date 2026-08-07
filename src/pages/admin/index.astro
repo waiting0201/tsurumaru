@@ -7,19 +7,27 @@
 import Admin from '../../layouts/Admin.astro';
 import Panel from '../../components/admin/Panel.astro';
 import { requireAdmin, handleGuard } from '../../lib/admin-guard';
-import { csrfToken, RESOURCES, can } from '../../lib/auth';
+import { csrfToken, RESOURCES, can, canView, resourceFor, viewableTypes } from '../../lib/auth';
 import { dashboardStats } from '../../lib/admin-db';
 import { VEHICLE_TYPE } from '../../lib/enums';
 
 export const prerender = false;
 
-let admin, csrf, stats, mayAddVehicle = false;
+// 總覽只呼叫 requireAdmin，所以每一個數字都必須自己比對權限 ——
+// 否則沒有任何權限的帳號雖然進不去各資源頁，卻能在這裡看到全部筆數。
+let admin, csrf, stats;
+let vehicleTypes: number[] = [], makeTypes: number[] = [], modelTypes: number[] = [];
+let mayViewPhotos = false, mayViewAdmins = false;
 try {
   admin = await requireAdmin(Astro);
   csrf = await csrfToken(admin.sessionId);
-  [stats, mayAddVehicle] = await Promise.all([
+  [stats, vehicleTypes, makeTypes, modelTypes, mayViewPhotos, mayViewAdmins] = await Promise.all([
     dashboardStats(),
-    can(admin, RESOURCES.VEHICLES, 'add'),
+    viewableTypes(admin, 'vehicles'),
+    viewableTypes(admin, 'makes'),
+    viewableTypes(admin, 'models'),
+    canView(admin, RESOURCES.PHOTOS),
+    canView(admin, RESOURCES.ADMINS),
   ]);
 } catch (e) {
   return handleGuard(e);
@@ -30,20 +38,32 @@ const n = (v: number | undefined) => (v ?? 0).toLocaleString('en-US');
 const stock = [
   { label: '汽車', code: 'CARS', n: stats?.cars ?? 0, type: VEHICLE_TYPE.CAR },
   { label: '機車', code: 'BIKES', n: stats?.bikes ?? 0, type: VEHICLE_TYPE.BIKE },
-];
+].filter((s) => vehicleTypes.includes(s.type));
 
 const master = [
-  { label: '車廠', n: stats?.makes ?? 0, href: '/admin/makes' },
-  { label: '車型', n: stats?.models ?? 0, href: '/admin/models' },
-  { label: '相片', n: stats?.photos ?? 0, href: '/admin/vehicles' },
-  { label: '管理員', n: stats?.admins ?? 0, href: '/admin/admins' },
-];
+  { label: '車廠', n: stats?.makes ?? 0, href: `/admin/makes?type=${makeTypes[0]}`, show: makeTypes.length > 0 },
+  { label: '車型', n: stats?.models ?? 0, href: `/admin/models?type=${modelTypes[0]}`, show: modelTypes.length > 0 },
+  { label: '相片', n: stats?.photos ?? 0, href: '/admin/vehicles', show: mayViewPhotos },
+  { label: '管理員', n: stats?.admins ?? 0, href: '/admin/admins', show: mayViewAdmins },
+].filter((m) => m.show);
+
+// 新增車輛的按鈕，依車種分別判斷
+const addable = await Promise.all(
+  vehicleTypes.map(async (t) => ({
+    type: t,
+    label: t === VEHICLE_TYPE.CAR ? '汽車' : '機車',
+    ok: await can(admin, resourceFor('vehicles', t), 'add'),
+  })),
+);
+const mayAdd = addable.filter((a) => a.ok);
 ---
 
 <Admin title="總覽" admin={admin} csrf={csrf}>
   <div class="space-y-5">
     <!-- ── 在庫 ─────────────────────────────────────────────────────────
-         每天真正在動的兩個數字，給它們最大的字級與整個面板的寬度。 -->
+         每天真正在動的數字，給它們最大的字級與整個面板的寬度。
+         只顯示這個管理員有權讀取的車種。 -->
+    {stock.length > 0 && (
     <Panel title="在庫" flush>
       <!-- gap-px + 底色 = 細格線，不用逐格算 border 該加在哪一邊 -->
       <div class="grid gap-px bg-rule sm:grid-cols-2">
@@ -69,8 +89,10 @@ const master = [
         }
       </div>
     </Panel>
+    )}
 
     <!-- ── 主檔 ───────────────────────────────────────────────────────── -->
+    {master.length > 0 && (
     <Panel title="主檔與帳號" flush>
       <dl class="grid grid-cols-2 gap-px bg-rule sm:grid-cols-4">
         {
@@ -83,23 +105,30 @@ const master = [
         }
       </dl>
     </Panel>
+    )}
 
     <!-- ── 常用動作 ────────────────────────────────────────────────────
          按鈕名稱就是它會做的事，跟目的地頁面的標題一致。 -->
     {
-      mayAddVehicle && (
+      mayAdd.length > 0 && (
         <Panel title="新增一台車">
           <div class="flex flex-wrap gap-2">
-            <a class="tm-btn" href={`/admin/vehicles/edit?type=${VEHICLE_TYPE.CAR}`}>
-              新增汽車
-            </a>
-            <a class="tm-btn" href={`/admin/vehicles/edit?type=${VEHICLE_TYPE.BIKE}`}>
-              新增機車
-            </a>
+            {mayAdd.map((a) => (
+              <a class="tm-btn" href={`/admin/vehicles/edit?type=${a.type}`}>
+                新增{a.label}
+              </a>
+            ))}
           </div>
           <p class="tm-field-hint">相片在車輛存檔後，從該車的「相簿」上傳。</p>
         </Panel>
       )
     }
+
+    {stock.length === 0 && master.length === 0 && (
+      <Panel title="沒有可用的功能">
+        <p class="text-[15px] text-ink">這個帳號還沒有被指派任何權限。</p>
+        <p class="tm-field-hint">請有「管理者維護」權限的人在管理員頁面指派。</p>
+      </Panel>
+    )}
   </div>
 </Admin>

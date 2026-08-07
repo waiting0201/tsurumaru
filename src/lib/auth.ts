@@ -10,6 +10,7 @@
 
 import { env } from 'cloudflare:workers';
 import type { AdminRow } from './types';
+import { VEHICLE_TYPE } from './enums';
 
 // ── 密碼雜湊 ────────────────────────────────────────────
 // Workers 沒有原生 bcrypt/argon2，用 WebCrypto 的 PBKDF2-SHA256。
@@ -189,15 +190,44 @@ export async function login(username: string, password: string): Promise<AdminRo
  * 不像舊版從 action 名稱字串推導（改個名字就靜默失去控管）。
  */
 export const RESOURCES = {
-  MAKES: 'CarMakes',      // 車廠（汽機車共用同一節點群）
+  MAKES: 'CarMakes',
   MODELS: 'CarModels',
   VEHICLES: 'Cars',
+  MOTOR_MAKES: 'MotorMakes',
+  MOTOR_MODELS: 'MotorModels',
+  MOTORS: 'Motors',
   PHOTOS: 'Photos',       // 舊版權限樹缺這個節點，已於搬遷時補上
   ADMINS: 'Admins',
 } as const;
 
 export type ResourceKey = (typeof RESOURCES)[keyof typeof RESOURCES];
 export type Action = 'add' | 'update' | 'delete';
+
+/**
+ * 車廠／車型／車輛這三種資源，權限是「依車種分開」的 —— 舊後台就是這樣，
+ * ADR-0005 要求保留權限語意。
+ *
+ * ⚠️ 頁面在 ADR-0005 被合併成單一頁以 ?type= 區分，但權限沒有跟著合併。
+ *    一定要用這個函式取得資源鍵，不可以寫死 RESOURCES.VEHICLES ——
+ *    寫死的話「只給汽車權限」會連帶開放機車，而「只給機車權限」會完全無效。
+ *    這正是 2026-08-07 debug 時找到的缺陷。
+ */
+const BY_TYPE = {
+  makes: { [VEHICLE_TYPE.CAR]: RESOURCES.MAKES, [VEHICLE_TYPE.BIKE]: RESOURCES.MOTOR_MAKES },
+  models: { [VEHICLE_TYPE.CAR]: RESOURCES.MODELS, [VEHICLE_TYPE.BIKE]: RESOURCES.MOTOR_MODELS },
+  vehicles: { [VEHICLE_TYPE.CAR]: RESOURCES.VEHICLES, [VEHICLE_TYPE.BIKE]: RESOURCES.MOTORS },
+} as const;
+
+export function resourceFor(kind: keyof typeof BY_TYPE, type: number): ResourceKey {
+  return BY_TYPE[kind][type === VEHICLE_TYPE.BIKE ? VEHICLE_TYPE.BIKE : VEHICLE_TYPE.CAR];
+}
+
+/** 這個管理員能看的車種（用來決定要顯示哪些切換頁籤、預設進哪一種） */
+export async function viewableTypes(admin: AuthedAdmin, kind: keyof typeof BY_TYPE): Promise<number[]> {
+  const types = [VEHICLE_TYPE.CAR, VEHICLE_TYPE.BIKE];
+  const allowed = await Promise.all(types.map((t) => canView(admin, resourceFor(kind, t))));
+  return types.filter((_, i) => allowed[i]);
+}
 
 /**
  * 查詢某管理員對某資源的權限。查不到一律視為無權限（fail closed）。

@@ -9,7 +9,7 @@ import Panel from '../../../components/admin/Panel.astro';
 import Flash from '../../../components/admin/Flash.astro';
 import { requireView, requireCan, requirePost, handleGuard, str } from '../../../lib/admin-guard';
 import { csrfToken, RESOURCES, can } from '../../../lib/auth';
-import { getVehicleRow, listPhotos, insertPhoto, updatePhotoMeta, deletePhotoRow, getPhoto } from '../../../lib/admin-db';
+import { getVehicleRow, listPhotos, insertPhoto, updatePhotoMeta, deletePhotoRow, getPhoto, nextPhotoSort } from '../../../lib/admin-db';
 import {
   putVehiclePhoto, deleteVehiclePhoto, newPhotoFilename, photoUrl,
   ALLOWED_IMAGE_TYPES, MAX_UPLOAD_BYTES, sniffImageType,
@@ -40,6 +40,10 @@ try {
       const files = form.getAll('photos').filter((f): f is File => f instanceof File && f.size > 0);
       if (!files.length) err = '請選擇要上傳的圖片。';
       let added = 0;
+      // sort 要接在既有相片後面。這裡必須實際查一次 —— photos 變數到函式
+      // 尾端才被賦值，在這個時間點還是空陣列，拿它算會讓每一批都從 0 重排，
+      // 跟既有相片撞值。
+      let sort = await nextPhotoSort(vehicle.id);
       for (const file of files) {
         if (file.size > MAX_UPLOAD_BYTES) { err = `有檔案超過 ${(MAX_UPLOAD_BYTES / 1024 / 1024).toFixed(0)} MB 上限，已略過。`; continue; }
         const buf = await file.arrayBuffer();
@@ -49,8 +53,9 @@ try {
         await putVehiclePhoto(vehicle.id, name, buf, sniffed);
         await insertPhoto({
           id: crypto.randomUUID().toLowerCase(), vehicle_id: vehicle.id,
-          photo: name, title: null, sort: (photos.length + added) * 5,
+          photo: name, title: null, sort,
         });
+        sort += 5;
         added++;
       }
       if (added) msg = `已上傳 ${added} 張。`;
