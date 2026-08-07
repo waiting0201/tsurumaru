@@ -2,7 +2,7 @@
 
 中古車／重機買賣網站。舊版是 ASP.NET MVC 5 + Azure SQL，正在改寫為 **Astro SSR on Cloudflare Workers + D1 + R2**。
 
-> **目前狀態：已上線** — https://www.tsurumarucorp.com 前台 8 個頁面、後台全部功能、資料與圖片搬遷（本地）都已完成並驗證。
+> **目前狀態：已上線** — https://www.tsurumarucorp.com
 > 前台 8 頁、後台全功能、資料與圖片搬遷、CI/CD 皆已完成並驗證。逐項狀態見 [docs/README.md](docs/README.md#現況)。
 > 尚未處理：正式後台密碼（見 [docs/07-migration.md](docs/07-migration.md#管理員密碼)）、R2 圖片自訂網域（見 [docs/10-cost.md](docs/10-cost.md)）。
 
@@ -79,13 +79,15 @@ npm run deploy                                     # 建置並部署到 Workers
 
 ---
 
-## 版本基準（2026-08-06 查證）
+## 版本基準（2026-08-07 實裝）
 
 | 套件 | 版本 |
 |---|---|
-| astro | 7.1.6 |
-| @astrojs/cloudflare | 14.1.7 |
+| astro | 7.2.0 |
+| @astrojs/cloudflare | 14.2.0 |
 | wrangler | 4.119.0 |
 | Node | 24.x |
+| typescript | 5.9.x（**不可升 7** — `@astrojs/check` 的 peer 是 ^5 \|\| ^6） |
 
-⚠️ **Adapter v13+ 已移除 `Astro.locals.runtime`**，binding 改用 `import { env } from 'cloudflare:workers'`。首次 scaffold 時請以實際安裝版本的官方文件複驗，見 [docs/02-architecture.md](docs/02-architecture.md#bindings-存取方式)。
+⚠️ **Adapter 已移除 `Astro.locals.runtime`**，binding 一律用 `import { env } from 'cloudflare:workers'`。
+⚠️ **`wrangler.jsonc` 的 `main` 不可指向 `dist/_worker.js`**，`assets.directory` 必須是 `./dist/client`（指向 `./dist` 會把伺服器程式碼當靜態檔案公開）。詳見 [docs/02-architecture.md](docs/02-architecture.md#bindings-存取方式)。
