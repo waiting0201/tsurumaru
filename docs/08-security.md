@@ -20,7 +20,7 @@
 | 12 | `trust level="Full"` | [Web.Release.config:17](../reference/old/Tsurumaru/Web.Release.config#L17) | 不適用（Workers 沙箱） |
 | 13 | 權限樹缺少相簿節點，導致相簿管理對一般管理員完全不可用 | `Lims` 資料 + [CheckSessionAttribute.cs:58](../reference/old/Tsurumaru/Filters/CheckSessionAttribute.cs#L58) | 權限節點涵蓋所有資源，並於啟動時驗證完整性（見下） |
 | 14 | 權限不足時導向 `/Error/Validation`，但**專案內沒有 ErrorController** → 使用者看到 404 | [CheckSessionAttribute.cs:65](../reference/old/Tsurumaru/Filters/CheckSessionAttribute.cs#L65) | 回傳 403 並顯示明確訊息 |
-| 15 | 唯一的管理員帳號 `itadmin` 密碼僅 6 字元、明碼儲存 | 本機 Docker `tsurumaru.Admins` | 強制密碼長度與複雜度；重設流程見 [07](07-migration.md#管理員密碼) |
+| 15 | 唯一的管理員帳號 `itadmin` 密碼僅 6 字元、明碼儲存 | 本機 Docker `tsurumaru.Admins` | 改存 PBKDF2 雜湊、不搬舊密碼；**長度限制依業主決定不設**（見[密碼](#密碼)）。重設流程見 [07](07-migration.md#管理員密碼) |
 
 ### 相簿管理對一般管理員完全不可用
 
@@ -51,6 +51,19 @@
 ## 新版安全要求
 
 ### 密碼
+
+**⚠️ 不設最短長度限制（業主決定，2026-08-07）。**
+
+一併決定不加登入次數限制。這兩項是明確的取捨，不是疏漏 —— 日後看到「後台可以設一碼密碼」時，請先確認業主是否改變主意，不要當成 bug 直接改掉。
+
+實務上的意義：登入表單可以無限次嘗試，而密碼可以很短，因此**猜中密碼是目前後台最現實的入侵途徑**。PBKDF2 雜湊保護的是「資料庫外洩後密碼不會被還原」，擋不住從登入表單暴力嘗試。
+
+若日後想補強，成本由低到高：
+1. 登入失敗次數限制（存 D1，不需外部服務）
+2. Cloudflare Turnstile 掛在登入表單
+3. 恢復最短長度限制
+
+以下是仍然生效的部分：
 
 - Workers 沒有原生 bcrypt／argon2。用 **WebCrypto 的 PBKDF2-SHA256**，高迭代次數 + 每個使用者獨立 salt
 - 儲存格式含演算法與參數，方便日後升級：`pbkdf2$sha256$<iterations>$<salt_b64>$<hash_b64>`

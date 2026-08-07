@@ -15,7 +15,9 @@ import {
 
 export const prerender = false;
 
-const MIN_PASSWORD = 12;
+// 依業主決定，後台密碼不設最短長度限制（2026-08-07）。
+// 空字串仍然拒絕 —— 那不是「短密碼」而是「沒有密碼」。
+// 見 docs/08-security.md#密碼
 
 let admin, csrf, admins, permissions, mayAdd = false, mayUpdate = false, mayDelete = false;
 let editing = null, editingPerms = new Map();
@@ -33,7 +35,6 @@ try {
       await requireCan(Astro, RESOURCES.ADMINS, 'add');
       const username = str(form, 'username'), password = str(form, 'password');
       if (!username || !password) err = '帳號與密碼都是必填。';
-      else if (password.length < MIN_PASSWORD) err = `密碼至少需要 ${MIN_PASSWORD} 個字元。`;
       else {
         try {
           await insertAdmin(str(form, 'name') || null, username, await hashPassword(password),
@@ -50,10 +51,7 @@ try {
         await updateAdminInfo(target.id, str(form, 'name') || null, str(form, 'email') || null,
           str(form, 'is_super') === '1' ? 1 : 0);
         const password = str(form, 'password');
-        if (password) {
-          if (password.length < MIN_PASSWORD) err = `密碼至少需要 ${MIN_PASSWORD} 個字元，密碼未變更。`;
-          else await updateAdminPassword(target.id, await hashPassword(password));
-        }
+        if (password) await updateAdminPassword(target.id, await hashPassword(password));
         const perms = (await allPermissions()).map((p) => ({
           permissionId: p.id,
           add: form.get(`perm_${p.id}_add`) === '1',
@@ -128,7 +126,7 @@ const permOf = (id: number) => editingPerms.get(id) ?? { add: false, update: fal
         <div class="grid">
           <div><label for="e-name">姓名</label><input id="e-name" name="name" type="text" value={editing.name ?? ''}></div>
           <div><label for="e-email">Email</label><input id="e-email" name="email" type="email" value={editing.email ?? ''}></div>
-          <div><label for="e-pw">新密碼（留空表示不變更）</label><input id="e-pw" name="password" type="password" autocomplete="new-password" minlength={MIN_PASSWORD}></div>
+          <div><label for="e-pw">新密碼（留空表示不變更）</label><input id="e-pw" name="password" type="password" autocomplete="new-password"></div>
           <div><label for="e-super">角色</label>
             <select id="e-super" name="is_super">
               <option value="0" selected={editing.is_super !== 1}>一般管理員</option>
@@ -184,7 +182,7 @@ const permOf = (id: number) => editingPerms.get(id) ?? { add: false, update: fal
           <div><label for="c-username">帳號</label><input id="c-username" name="username" type="text" required></div>
           <div><label for="c-name">姓名</label><input id="c-name" name="name" type="text"></div>
           <div><label for="c-email">Email</label><input id="c-email" name="email" type="email"></div>
-          <div><label for="c-pw">密碼（至少 {MIN_PASSWORD} 字元）</label><input id="c-pw" name="password" type="password" autocomplete="new-password" minlength={MIN_PASSWORD} required></div>
+          <div><label for="c-pw">密碼</label><input id="c-pw" name="password" type="password" autocomplete="new-password" required></div>
           <div><label for="c-super">角色</label>
             <select id="c-super" name="is_super"><option value="0">一般管理員</option><option value="1">超級管理員</option></select></div>
         </div>

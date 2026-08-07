@@ -24,10 +24,8 @@ if (!username || !password) {
   console.error('用法：node scripts/set-admin-password.mjs <username> <password> [--remote] [--super]');
   process.exit(1);
 }
-if (password.length < 12) {
-  console.error('❌ 密碼至少需要 12 個字元。');
-  process.exit(1);
-}
+// 依業主決定，不設最短長度限制（2026-08-07）。空字串仍然拒絕 ——
+// 那不是「短密碼」而是「沒有密碼」。見 docs/08-security.md#密碼
 
 // 與 src/lib/auth.ts 的 hashPassword 完全相同的參數與格式
 const ITERATIONS = 210_000;
