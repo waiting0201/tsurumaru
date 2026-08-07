@@ -5,9 +5,9 @@
 //    （會撞到一個沒有解釋的 404）。搬遷時已補上 Photos 節點。
 //    見 docs/08-security.md#相簿管理對一般管理員完全不可用
 import Admin from '../../../layouts/Admin.astro';
-import { requireView, requireCan, requirePost, handleGuard, str, int } from '../../../lib/admin-guard';
+import { requireView, requireCan, requirePost, handleGuard, str } from '../../../lib/admin-guard';
 import { csrfToken, RESOURCES, can } from '../../../lib/auth';
-import { getVehicleRow, listPhotos, insertPhoto, updatePhotoMeta, deletePhotoRow, getPhoto, updateSorts } from '../../../lib/admin-db';
+import { getVehicleRow, listPhotos, insertPhoto, updatePhotoMeta, deletePhotoRow, getPhoto } from '../../../lib/admin-db';
 import {
   putVehiclePhoto, deleteVehiclePhoto, newPhotoFilename, photoUrl,
   ALLOWED_IMAGE_TYPES, MAX_UPLOAD_BYTES, sniffImageType,

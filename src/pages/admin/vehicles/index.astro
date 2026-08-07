@@ -1,7 +1,7 @@
 ---
 // 車輛列表。合併舊版的 Cars / Motors 兩套重複程式。
 import Admin from '../../../layouts/Admin.astro';
-import { requireView, requireCan, requirePost, handleGuard, str, int } from '../../../lib/admin-guard';
+import { requireView, requireCan, requirePost, handleGuard, str } from '../../../lib/admin-guard';
 import { csrfToken, RESOURCES, can } from '../../../lib/auth';
 import { listVehiclesAdmin, deleteVehicle, getVehicleRow, updateSorts, listPhotos } from '../../../lib/admin-db';
 import { deleteVehiclePhoto } from '../../../lib/media';

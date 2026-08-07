@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev",
+    "//prebuild": "binding 型別由 wrangler.jsonc 產生且不進版控，建置前重新產生以確保與設定同步（CI 沒有這個檔案）",
+    "prebuild": "wrangler types",
     "build": "astro check && astro build",
     "preview": "astro build && wrangler dev",
     "deploy": "astro build && wrangler deploy",
