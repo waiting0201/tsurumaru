@@ -21,7 +21,11 @@ const {
   image,
 } = Astro.props;
 
-const canonical = new URL(Astro.url.pathname, Astro.site ?? Astro.url.origin).href;
+// 預渲染頁的 Astro.url.pathname 會帶尾斜線（/about/），但 wrangler 的
+// html_handling: drop-trailing-slash 實際服務的是 /about，且 /about/ 會 307
+// 轉到 /about。canonical 不能指向一個會轉址的網址，這裡統一去掉尾斜線。
+const path = Astro.url.pathname.replace(/\/+$/, '') || '/';
+const canonical = new URL(path, Astro.site ?? Astro.url.origin).href;
 ---
 
 <!DOCTYPE html>
