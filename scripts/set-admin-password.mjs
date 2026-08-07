@@ -33,17 +33,73 @@ if (!username) {
   process.exit(1);
 }
 
-/** 隱藏輸入的提示。回傳原始字串，不做任何 trim —— 密碼的頭尾空白也是密碼的一部分 */
-function promptHidden(question) {
+/**
+ * 隱藏輸入的提示。回傳原始字串，不做任何 trim —— 密碼的頭尾空白也是密碼的一部分。
+ *
+ * 用 stdin 的 raw mode 逐字讀取，而不是 readline：readline 的 close() 會把
+ * stdin 一併關掉，導致第二次提示永遠收不到輸入（曾因此整個腳本靜默卡死）。
+ * 非 TTY 時（管線、CI）退回逐行讀取，不做遮蔽。
+ */
+/** 非 TTY 時把 stdin 一次讀完，之後的提示都從這裡取用 */
+let pipedLines = null;
+function readPipedLines() {
+  if (pipedLines) return Promise.resolve(pipedLines);
   return new Promise((resolve) => {
-    const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: true });
-    const onData = (char) => {
-      if (['\n', '\r', ''].includes(String(char))) process.stdin.removeListener('data', onData);
-      else process.stdout.write('\x1B[2K\x1B[200D' + question + '*'.repeat(rl.line.length));
-    };
+    let data = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', (c) => { data += c; });
+    process.stdin.on('end', () => {
+      pipedLines = data.replace(/\n$/, '').split('\n');
+      resolve(pipedLines);
+    });
+    process.stdin.resume();
+  });
+}
+
+function promptHidden(question) {
+  const stdin = process.stdin;
+
+  if (!stdin.isTTY) {
+    // 非 TTY 時一次把 stdin 讀完再分配 —— 每次提示各開一個 readline 會讓
+    // 第一個把 stdin 消耗掉，後面的提示永遠拿不到值。
+    return readPipedLines().then((lines) => lines.shift() ?? '');
+  }
+
+  return new Promise((resolve) => {
+    let buf = '';
     process.stdout.write(question);
-    process.stdin.on('data', onData);
-    rl.question('', (answer) => { rl.close(); process.stdout.write('\n'); resolve(answer); });
+    stdin.setRawMode(true);
+    stdin.resume();
+    stdin.setEncoding('utf8');
+
+    const done = (value) => {
+      stdin.setRawMode(false);
+      stdin.pause();
+      stdin.removeListener('data', onData);
+      process.stdout.write('\n');
+      resolve(value);
+    };
+
+    const onData = (chunk) => {
+      // raw mode 一次可能送來多個字元（例如貼上），逐字處理
+      for (const ch of String(chunk)) {
+        if (ch === '\n' || ch === '\r' || ch === '\u0004') return done(buf);
+        if (ch === '\u0003') {                        // Ctrl-C
+          stdin.setRawMode(false);
+          process.stdout.write('\n已取消，未做任何變更。\n');
+          process.exit(130);
+        }
+        if (ch === '\u007f' || ch === '\b') {         // Backspace
+          if (buf.length) { buf = buf.slice(0, -1); process.stdout.write('\b \b'); }
+          continue;
+        }
+        if (ch < ' ') continue;                       // 其餘控制字元忽略
+        buf += ch;
+        process.stdout.write('*');
+      }
+    };
+
+    stdin.on('data', onData);
   });
 }
 
@@ -53,10 +109,14 @@ if (password) {
   console.warn('   建議改為：node scripts/set-admin-password.mjs ' + username + (remote ? ' --remote' : '') + (makeSuper ? ' --super' : ''));
 } else {
   password = await promptHidden('請輸入新密碼：');
-  const again = await promptHidden('再輸入一次確認：');
-  if (password !== again) {
-    console.error('❌ 兩次輸入不一致，未做任何變更。');
-    process.exit(1);
+  // 管線只餵一行時（例如 <<< "$PW"）不要求確認；互動輸入一律確認兩次
+  const needConfirm = process.stdin.isTTY || (pipedLines && pipedLines.length > 0);
+  if (needConfirm) {
+    const again = await promptHidden('再輸入一次確認：');
+    if (password !== again) {
+      console.error('❌ 兩次輸入不一致，未做任何變更。');
+      process.exit(1);
+    }
   }
 }
 
