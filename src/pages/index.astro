@@ -1,0 +1,228 @@
+---
+// 對應 reference/old/Tsurumaru/Views/Home/Index.cshtml
+// DOM 與 class 完全照搬（紅線一）。
+import Site from '../layouts/Site.astro';
+import VehicleCard from '../components/site/VehicleCard.astro';
+import { getFeatured } from '../lib/db';
+import { VEHICLE_TYPE } from '../lib/enums';
+
+// 汽車、機車各取 sort 最小的 6 台（HomeController.Index）
+const [cars, bikes] = await Promise.all([
+  getFeatured(VEHICLE_TYPE.CAR, 6),
+  getFeatured(VEHICLE_TYPE.BIKE, 6),
+]);
+
+const CAROUSEL_OPTS = '{"items": 3, "responsive": {"0":{"items":1, "gutter": 16},"500":{"items":2, "gutter": 18},"900":{"items":3, "gutter": 20}, "1100":{"gutter": 24}}}';
+---
+
+<Site>
+<!-- Page content-->
+<!-- Hero + Search form-->
+<section class="bg-top-center bg-repeat-0 mt-114">
+    <div id="carouselExampleIndicators" class="carousel slide" data-bs-ride="carousel">
+        <div class="carousel-indicators">
+            <button type="button" data-bs-target="#carouselExampleIndicators" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Slide 1"></button>
+            <button type="button" data-bs-target="#carouselExampleIndicators" data-bs-slide-to="1" aria-label="Slide 2"></button>
+            <button type="button" data-bs-target="#carouselExampleIndicators" data-bs-slide-to="2" aria-label="Slide 3"></button>
+        </div>
+        <div class="carousel-inner">
+            <div class="carousel-item active">
+                <img src="/content/img/banner/banner01.jpg" class="d-block w-100" alt="...">
+                <div class="carousel-caption d-none d-md-block">
+                    <h5 class="text-light">Easy way to find the right car</h5>
+                    <p>輕鬆找到合適您的優質二手日本車</p>
+                </div>
+            </div>
+            <div class="carousel-item">
+                <img src="/content/img/banner/banner02.jpg" class="d-block w-100" alt="...">
+                <div class="carousel-caption d-none d-md-block">
+                    <h5 class="fs-1 text-light">Easy way to find the right car</h5>
+                    <p>輕鬆找到合適您的優質二手日本車</p>
+                </div>
+            </div>
+            <div class="carousel-item">
+                <img src="/content/img/banner/banner03.jpg" class="d-block w-100" alt="...">
+                <div class="carousel-caption d-none d-md-block">
+                    <h5 class="fs-1 text-light">Easy way to find the right car</h5>
+                    <p>輕鬆找到合適您的優質二手日本車</p>
+                </div>
+            </div>
+
+            <button class="carousel-control-prev" type="button" data-bs-target="#carouselExampleIndicators" data-bs-slide="prev">
+                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                <span class="visually-hidden">Previous</span>
+            </button>
+            <button class="carousel-control-next" type="button" data-bs-target="#carouselExampleIndicators" data-bs-slide="next">
+                <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                <span class="visually-hidden">Next</span>
+            </button>
+        </div>
+    </div>
+</section>
+
+<!-- Hero + Search form-->
+<section class="bg-top-center bg-repeat-0 pt-5">
+    <div class="container mt-4 mt-sm-3 mt-lg-n3 pb-5 mb-md-4">
+        <!-- Form group-->
+        <form class="form-group form-group-dark d-block">
+            <div class="row g-0 ms-lg-n2">
+                <div class="col-lg-3">
+                    <div class="dropdown border-end-sm border-dark" data-bs-toggle="select">
+                        <button class="btn btn-link dropdown-toggle ps-2 ps-sm-3" type="button" data-bs-toggle="dropdown"><i class="fi-list me-2"></i><span class="dropdown-toggle-label">我想找</span></button>
+                        <input type="hidden" name="type">
+                        <ul class="dropdown-menu dropdown-menu-light">
+                            <li><a class="dropdown-item" href="#"><span class="dropdown-item-label">汽車</span></a></li>
+                            <li><a class="dropdown-item" href="#"><span class="dropdown-item-label">機車</span></a></li>
+                        </ul>
+                    </div>
+                </div>
+                <hr class="hr-dark d-lg-none my-2">
+                <div class="col-lg-3 col-md-3 col-sm-6">
+                    <div class="dropdown border-end-sm border-dark" data-bs-toggle="select">
+                        <button class="btn btn-link dropdown-toggle ps-2 ps-sm-3" type="button" data-bs-toggle="dropdown"><i class="fi-list me-2"></i><span class="dropdown-toggle-label">品牌Brand</span></button>
+                        <input type="hidden" name="make">
+                        <ul class="dropdown-menu dropdown-menu-light">
+                            <li><a class="dropdown-item" href="#"><span class="dropdown-item-label">Acura</span></a></li>
+                            <li><a class="dropdown-item" href="#"><span class="dropdown-item-label">BMW</span></a></li>
+                            <li><a class="dropdown-item" href="#"><span class="dropdown-item-label">Citroen</span></a></li>
+                            <li><a class="dropdown-item" href="#"><span class="dropdown-item-label">Lexus</span></a></li>
+                            <li><a class="dropdown-item" href="#"><span class="dropdown-item-label">Mercedes-Benz</span></a></li>
+                            <li><a class="dropdown-item" href="#"><span class="dropdown-item-label">Nissan</span></a></li>
+                            <li><a class="dropdown-item" href="#"><span class="dropdown-item-label">Toyota</span></a></li>
+                        </ul>
+                    </div>
+                </div>
+                <hr class="hr-light d-sm-none my-2">
+                <div class="col-lg-3 col-md-3 col-sm-6">
+                    <div class="dropdown border-end-md border-light" data-bs-toggle="select">
+                        <button class="btn btn-link dropdown-toggle ps-2 ps-sm-3" type="button" data-bs-toggle="dropdown"><i class="fi-list me-2"></i><span class="dropdown-toggle-label">型號Model</span></button>
+                        <input type="hidden" name="model">
+                        <ul class="dropdown-menu dropdown-menu-light">
+                            <li><a class="dropdown-item" href="#"><span class="dropdown-item-label">Altima</span></a></li>
+                            <li><a class="dropdown-item" href="#"><span class="dropdown-item-label">Juke</span></a></li>
+                            <li><a class="dropdown-item" href="#"><span class="dropdown-item-label">Leaf</span></a></li>
+                            <li><a class="dropdown-item" href="#"><span class="dropdown-item-label">Maxima</span></a></li>
+                            <li><a class="dropdown-item" href="#"><span class="dropdown-item-label">Micra</span></a></li>
+                            <li><a class="dropdown-item" href="#"><span class="dropdown-item-label">Murano</span></a></li>
+                            <li><a class="dropdown-item" href="#"><span class="dropdown-item-label">Note</span></a></li>
+                            <li><a class="dropdown-item" href="#"><span class="dropdown-item-label">Patrol</span></a></li>
+                        </ul>
+                    </div>
+                </div>
+                <hr class="hr-light d-md-none my-2">
+                <div class="col-lg-3 ">
+                    <button class="btn btn-primary w-90 float-sm-end" type="submit">Search</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</section>
+
+<section class="container py-2 py-sm-3">
+    <div class="row g-2 g-sm-4">
+        <div id="jpp_searchbox">ja_horizon</div>
+        <script is:inline src="https://www.j-platpat.inpit.go.jp/help/ja/i10/jpp_searchbox.js"></script>
+        <link rel="stylesheet" href="https://www.j-platpat.inpit.go.jp/help/ja/i10/jpp_searchbox.css">
+    </div>
+</section>
+
+{cars.length > 0 && (
+    <Fragment>
+    <!-- Latest cars (carousel)-->
+    <section class="container pt-sm-5 pt-4 pb-3">
+        <div class="align-items-center justify-content-between mb-3 mb-sm-4 pb-2">
+            <h2 class="h3 text-dark mb-3 mb-sm-0 text-center">Latest cars</h2>
+            <p class="text-dark mb-3 mb-sm-0 text-center">近期車輛</p>
+        </div>
+        <div class="tns-carousel-wrapper tns-controls-outside-xxl tns-nav-outside tns-carousel-light">
+            <div class="tns-carousel-inner p-sm-3" data-carousel-options={CAROUSEL_OPTS}>
+                {cars.map((car) => <VehicleCard vehicle={car} basePath="/cars" />)}
+            </div>
+        </div>
+    </section>
+    </Fragment>
+)}
+
+{bikes.length > 0 && (
+    <Fragment>
+    <!-- Latest cars (carousel)-->
+    <section class="container pt-sm-5 pt-4 pb-3">
+        <div class="align-items-center justify-content-between mb-3 mb-sm-4 pb-2">
+            <h2 class="h3 text-dark mb-3 mb-sm-0 text-center">Latest motorcycle</h2>
+            <p class="text-dark mb-3 mb-sm-0 text-center">近期摩托車</p>
+        </div>
+        <div class="tns-carousel-wrapper tns-controls-outside-xxl tns-nav-outside tns-carousel-light">
+            <div class="tns-carousel-inner p-sm-3" data-carousel-options={CAROUSEL_OPTS}>
+                {bikes.map((bike) => <VehicleCard vehicle={bike} basePath="/bikes" />)}
+            </div>
+        </div>
+    </section>
+    </Fragment>
+)}
+
+<!-- Brands-->
+<section class="container py-2 py-sm-3">
+    <div class="row g-2 g-sm-4">
+        <div class="col-3 col-sm-2 col-xl-1 mb-4 pb-2"><a class="opacity-40 opacity-transition d-table mx-auto" href="#"><img src="/content/img/car-finder/brands/opel.svg" width="86" alt="Opel"></a></div>
+        <div class="col-3 col-sm-2 col-xl-1 mb-4 pb-2"><a class="opacity-40 opacity-transition d-table mx-auto" href="#"><img src="/content/img/car-finder/brands/audi.svg" width="86" alt="Audi"></a></div>
+        <div class="col-3 col-sm-2 col-xl-1 mb-4 pb-2"><a class="opacity-40 opacity-transition d-table mx-auto" href="#"><img src="/content/img/car-finder/brands/mercedes.svg" width="86" alt="Mercedes-Benz"></a></div>
+        <div class="col-3 col-sm-2 col-xl-1 mb-4 pb-2"><a class="opacity-40 opacity-transition d-table mx-auto" href="#"><img src="/content/img/car-finder/brands/toyota.svg" width="86" alt="Toyota"></a></div>
+        <div class="col-3 col-sm-2 col-xl-1 mb-4 pb-2"><a class="opacity-40 opacity-transition d-table mx-auto" href="#"><img src="/content/img/car-finder/brands/mazda.svg" width="86" alt="Mazda"></a></div>
+        <div class="col-3 col-sm-2 col-xl-1 mb-4 pb-2"><a class="opacity-40 opacity-transition d-table mx-auto" href="#"><img src="/content/img/car-finder/brands/nissan.svg" width="86" alt="Nissan"></a></div>
+        <div class="col-3 col-sm-2 col-xl-1 mb-4 pb-2"><a class="opacity-40 opacity-transition d-table mx-auto" href="#"><img src="/content/img/car-finder/brands/hyundai.svg" width="86" alt="Hyundai"></a></div>
+        <div class="col-3 col-sm-2 col-xl-1 mb-4 pb-2"><a class="opacity-40 opacity-transition d-table mx-auto" href="#"><img src="/content/img/car-finder/brands/lexus.svg" width="86" alt="Lexus"></a></div>
+        <div class="col-3 col-sm-2 col-xl-1 mb-4 pb-2"><a class="opacity-40 opacity-transition d-table mx-auto" href="#"><img src="/content/img/car-finder/brands/honda.svg" width="86" alt="Honda"></a></div>
+        <div class="col-3 col-sm-2 col-xl-1 mb-4 pb-2"><a class="opacity-40 opacity-transition d-table mx-auto" href="#"><img src="/content/img/car-finder/brands/renault.svg" width="86" alt="Renault"></a></div>
+        <div class="col-3 col-sm-2 col-xl-1 mb-4 pb-2"><a class="opacity-40 opacity-transition d-table mx-auto" href="#"><img src="/content/img/car-finder/brands/infiniti.svg" width="86" alt="Infiniti"></a></div>
+        <div class="col-3 col-sm-2 col-xl-1 mb-4 pb-2"><a class="opacity-40 opacity-transition d-table mx-auto" href="#"><img src="/content/img/car-finder/brands/mitsubishi.svg" width="86" alt="Mitsubishi"></a></div>
+    </div>
+</section>
+
+<!-- Features-->
+<section class="container pt-4 pt-md-5">
+    <div class="align-items-center justify-content-between">
+        <h2 class="h3 text-dark mb-2 mb-sm-0 text-center">How To bid</h2>
+        <p class="text-dark mb-3 mb-sm-0 text-center">安心服務</p>
+    </div>
+    <div class="row">
+        <div class="col-md-5 col-lg-4 offset-lg-1 pt-4 mt-2 pt-md-5 mt-md-3">
+            <div class="d-flex pb-4 pb-md-5 mb-2">
+                <i class="fi-search lead text-primary mt-1 order-md-2"></i>
+                <div class="text-md-end ps-3 ps-md-0 pe-md-3 order-md-1">
+                    <h3 class="h6 text-dark mb-1">售前車輛點檢服務</h3>
+                    <p class="fs-sm text-dark opacity-70 mb-0">售前車輛點檢服務文案代補文案代補文案代補文案代補文案代補文案代補文案代補</p>
+                </div>
+            </div>
+            <div class="d-flex pb-4 pb-md-5 mb-2">
+                <i class="fi-file lead text-primary mt-1 order-md-2"></i>
+                <div class="text-md-end ps-3 ps-md-0 pe-md-3 order-md-1">
+                    <h3 class="h6 text-dark mb-1">不售有修復歷車</h3>
+                    <p class="fs-sm text-dark opacity-70 mb-0">修復歷車車體部（主要內側）的骨架部分依損傷,部分交換或是有修正,修補等</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2 d-none d-md-block">
+            <div class="position-relative mx-auto h-100" style="max-width: 5rem; min-height: 26rem;">
+                <div class="content-overlay pt-5" data-jarallax-element="100"><img class="pt-3 mt-5" src="/content/img/car-finder/home/car.svg" alt="Car"></div>
+                <div class="position-absolute top-0 start-50 translate-middle-x h-100 overflow-hidden"><img src="/content/img/car-finder/home/road-line.svg" width="2" alt="Road line"></div>
+            </div>
+        </div>
+        <div class="col-md-5 col-lg-4 pt-md-5 mt-md-3">
+            <div class="d-flex pb-4 pb-md-5 mb-2">
+                <i class="fi-info-circle lead text-primary mt-1"></i>
+                <div class="ps-3">
+                    <h3 class="h6 text-dark mb-1">車輛售後品質保證（限日本國內新車購入）</h3>
+                    <p class="fs-sm text-dark opacity-70 mb-0">無泡水車, 無重大車故, 無車引擎號碼非法車輛</p>
+                </div>
+            </div>
+            <div class="d-flex pb-4 pb-md-5 mb-2">
+                <i class="fi-users lead text-primary mt-1"></i>
+                <div class="ps-3">
+                    <h3 class="h6 text-dark mb-1">請加入專屬會員(另有專人專案)</h3>
+                    <p class="fs-sm text-dark opacity-70 mb-0">依賣場不同檢查員會有分數評最高為10點,其內容詳閱售車資訊</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+</Site>

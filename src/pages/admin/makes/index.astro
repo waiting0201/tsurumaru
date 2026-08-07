@@ -1,0 +1,162 @@
+---
+// 車廠維護。對應舊版 WebMsController 的 CarMakes / MotorMakes 兩套重複程式，
+// 這裡合併為單一頁面，以 ?type= 區分（docs/04-conventions.md）。
+import Admin from '../../../layouts/Admin.astro';
+import { requireView, requireCan, requirePost, handleGuard, str, int } from '../../../lib/admin-guard';
+import { csrfToken, RESOURCES, can } from '../../../lib/auth';
+import { listMakes, createMake, updateMake, deleteMake, makeInUse, getMake, updateSorts } from '../../../lib/admin-db';
+import { VEHICLE_TYPE } from '../../../lib/enums';
+
+export const prerender = false;
+
+const type = Number(Astro.url.searchParams.get('type')) === VEHICLE_TYPE.BIKE ? VEHICLE_TYPE.BIKE : VEHICLE_TYPE.CAR;
+const page = Math.max(1, Number(Astro.url.searchParams.get('p')) || 1);
+const typeName = type === VEHICLE_TYPE.CAR ? '汽車' : '機車';
+
+let admin, csrf, data, mayAdd = false, mayUpdate = false, mayDelete = false;
+let msg = '', err = '';
+
+try {
+  admin = await requireView(Astro, RESOURCES.MAKES);
+  csrf = await csrfToken(admin.sessionId);
+
+  if (Astro.request.method === 'POST') {
+    const form = await requirePost(Astro, admin);
+    const action = str(form, 'action');
+
+    if (action === 'create') {
+      await requireCan(Astro, RESOURCES.MAKES, 'add');
+      const code = str(form, 'code'), title = str(form, 'title');
+      if (!code || !title) err = '代碼與名稱都是必填。';
+      else { await createMake(type, code, title, int(form, 'sort') ?? 0); msg = `已新增「${title}」。`; }
+    } else if (action === 'update') {
+      await requireCan(Astro, RESOURCES.MAKES, 'update');
+      const id = int(form, 'id');
+      const code = str(form, 'code'), title = str(form, 'title');
+      if (!id || !(await getMake(id))) err = '找不到該車廠。';
+      else if (!code || !title) err = '代碼與名稱都是必填。';
+      else { await updateMake(id, code, title, int(form, 'sort') ?? 0); msg = '已更新。'; }
+    } else if (action === 'delete') {
+      await requireCan(Astro, RESOURCES.MAKES, 'delete');
+      const id = int(form, 'id');
+      if (!id || !(await getMake(id))) err = '找不到該車廠。';
+      else {
+        const used = await makeInUse(id);
+        if (used > 0) err = `這個車廠底下還有 ${used} 個車型，請先處理車型再刪除。`;
+        else { await deleteMake(id); msg = '已刪除。'; }
+      }
+    } else if (action === 'sort') {
+      await requireCan(Astro, RESOURCES.MAKES, 'update');
+      const ids = form.getAll('sort_id').map((v) => Number(v));
+      const sorts = form.getAll('sort_value').map((v) => Number(v));
+      await updateSorts('vehicle_makes', ids.map((id, i) => ({ id, sort: sorts[i] ?? 0 })));
+      msg = '排序已更新。';
+    }
+  }
+
+  [data, mayAdd, mayUpdate, mayDelete] = await Promise.all([
+    listMakes(type, page),
+    can(admin, RESOURCES.MAKES, 'add'),
+    can(admin, RESOURCES.MAKES, 'update'),
+    can(admin, RESOURCES.MAKES, 'delete'),
+  ]);
+} catch (e) {
+  return handleGuard(e);
+}
+
+const editId = Number(Astro.url.searchParams.get('edit')) || 0;
+const editing = editId ? data.items.find((m) => m.id === editId) : null;
+const qs = (o: Record<string, string | number>) =>
+  '?' + new URLSearchParams({ type: String(type), ...Object.fromEntries(Object.entries(o).map(([k, v]) => [k, String(v)])) }).toString();
+---
+<Admin title={`車廠維護 — ${typeName}`} admin={admin} csrf={csrf}>
+  {err && <div class="msg err">{err}</div>}
+  {msg && <div class="msg ok">{msg}</div>}
+
+  <div class="panel">
+    <div class="actions" style="margin-bottom:1rem">
+      <a class="btn secondary sm" href="/admin/makes?type=1" aria-current={type === 1 ? 'true' : undefined}>汽車</a>
+      <a class="btn secondary sm" href="/admin/makes?type=2" aria-current={type === 2 ? 'true' : undefined}>機車</a>
+      <span class="muted">共 {data.total} 筆</span>
+    </div>
+
+    <form method="post">
+      <input type="hidden" name="csrf" value={csrf}>
+      <input type="hidden" name="action" value="sort">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th style="width:6rem">排序</th><th>代碼</th><th>名稱</th><th style="width:12rem">操作</th></tr></thead>
+          <tbody>
+            {data.items.map((m) => (
+              <tr>
+                <td>
+                  <input type="hidden" name="sort_id" value={m.id}>
+                  <input type="number" name="sort_value" value={m.sort} disabled={!mayUpdate} style="width:5rem">
+                </td>
+                <td>{m.code}</td>
+                <td>{m.title}</td>
+                <td class="actions">
+                  {mayUpdate && <a class="btn secondary sm" href={qs({ p: page, edit: m.id })}>編輯</a>}
+                </td>
+              </tr>
+            ))}
+            {data.items.length === 0 && <tr><td colspan="4" class="muted">沒有資料。</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      {mayUpdate && data.items.length > 0 && (
+        <div style="margin-top:1rem"><button class="btn" type="submit">儲存排序</button></div>
+      )}
+    </form>
+
+    <div class="pager">
+      {Array.from({ length: data.totalPages }, (_, i) => i + 1).map((n) => (
+        n === data.page ? <span aria-current="page">{n}</span> : <a href={qs({ p: n })}>{n}</a>
+      ))}
+    </div>
+  </div>
+
+  {(mayUpdate && editing) && (
+    <div class="panel">
+      <h2 style="font-size:1.1rem;margin-top:0">編輯車廠</h2>
+      <form method="post">
+        <input type="hidden" name="csrf" value={csrf}>
+        <input type="hidden" name="action" value="update">
+        <input type="hidden" name="id" value={editing.id}>
+        <div class="grid">
+          <div><label for="e-code">代碼</label><input id="e-code" name="code" type="text" value={editing.code} required></div>
+          <div><label for="e-title">名稱</label><input id="e-title" name="title" type="text" value={editing.title} required></div>
+          <div><label for="e-sort">排序</label><input id="e-sort" name="sort" type="number" value={editing.sort}></div>
+        </div>
+        <div class="actions" style="margin-top:1rem">
+          <button class="btn" type="submit">儲存</button>
+          <a class="btn secondary" href={qs({ p: page })}>取消</a>
+        </div>
+      </form>
+      {mayDelete && (
+        <form method="post" style="margin-top:1rem" onsubmit="return confirm('確定刪除這個車廠？')">
+          <input type="hidden" name="csrf" value={csrf}>
+          <input type="hidden" name="action" value="delete">
+          <input type="hidden" name="id" value={editing.id}>
+          <button class="btn danger sm" type="submit">刪除這個車廠</button>
+        </form>
+      )}
+    </div>
+  )}
+
+  {mayAdd && (
+    <div class="panel">
+      <h2 style="font-size:1.1rem;margin-top:0">新增{typeName}車廠</h2>
+      <form method="post">
+        <input type="hidden" name="csrf" value={csrf}>
+        <input type="hidden" name="action" value="create">
+        <div class="grid">
+          <div><label for="c-code">代碼</label><input id="c-code" name="code" type="text" required></div>
+          <div><label for="c-title">名稱</label><input id="c-title" name="title" type="text" required></div>
+          <div><label for="c-sort">排序</label><input id="c-sort" name="sort" type="number" value="0"></div>
+        </div>
+        <div style="margin-top:1rem"><button class="btn" type="submit">新增</button></div>
+      </form>
+    </div>
+  )}
+</Admin>

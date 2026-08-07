@@ -1,0 +1,99 @@
+name: Deploy
+
+# push 到 master 即部署。詳見 docs/09-cicd.md
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+# 同時只跑一個部署，且不中斷進行中的部署
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # 這個 repo 是 public，任何 commit 都對全世界公開。
+  # 舊系統的明碼憑證就躺在 reference/（已被 .gitignore 排除），
+  # 這一關確保它們不會因為某次 git add -f 或 .gitignore 被改而外洩。
+  guard:
+    name: 機密防護
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: 確認機密未進版控
+        run: |
+          set -uo pipefail
+          fail=0
+
+          if [ -n "$(git ls-files reference)" ]; then
+            echo "::error::reference/ 下有檔案進入版控 — 該目錄含舊系統明碼憑證，必須保持排除"
+            git ls-files reference | head -20
+            fail=1
+          fi
+
+          for f in .dev.vars .env; do
+            if [ -n "$(git ls-files "$f")" ]; then
+              echo "::error::$f 不應進入版控（祕密只走 wrangler secret 與本機 .dev.vars）"
+              fail=1
+            fi
+          done
+
+          # 帶值的密碼指派與連線字串。刻意不寫死任何實際憑證字串 —
+          # 檢查指令本身若含祕密，就等於另一次外洩（見 docs/06-verification.md#憑證未外洩）
+          if git grep -nIE "(password|pwd)=[^ ;\"'|)]{4,}" -- . ; then
+            echo "::error::偵測到疑似密碼指派"
+            fail=1
+          fi
+
+          if git grep -nIE "data source=[^ ;\"'|)]{4,}" -- . ; then
+            echo "::error::偵測到疑似資料庫連線字串"
+            fail=1
+          fi
+
+          [ $fail -eq 0 ] && echo "✅ 未發現機密外洩" || exit 1
+
+  deploy:
+    name: 建置並部署
+    needs: guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.deployment-url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: 安裝相依套件
+        run: npm ci
+
+      # astro check（型別）+ astro build。失敗就不會走到部署。
+      - name: 建置
+        run: npm run build
+
+      # 順序很重要：schema 先於程式碼。
+      # 因此 migration 必須向前相容 — 舊版程式碼要能在新 schema 上正常運作，
+      # 否則這兩步之間會有一小段時間是壞的。詳見 docs/09-cicd.md
+      - name: 套用 D1 migrations
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 migrations apply tsurumaru --remote
+
+      - name: 部署到 Cloudflare Workers
+        id: deploy
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy

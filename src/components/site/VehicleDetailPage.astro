@@ -1,0 +1,173 @@
+---
+// 汽車／機車詳情頁的共用實作。
+// 對應 Views/Home/CarDetail.cshtml 與 BikeDetail.cshtml（兩者幾乎相同）。
+// DOM 與 class 完全照搬（紅線一）。
+import Site from '../../layouts/Site.astro';
+import VehicleCard from './VehicleCard.astro';
+import { photoUrl } from '../../lib/media';
+import { FUEL, TRANSMISSION, VEHICLE_BODY, label } from '../../lib/enums';
+import { sanitizeHtml } from '../../lib/sanitize';
+import type { VehicleWithNames, VehiclePhotoRow } from '../../lib/types';
+
+interface Props {
+  vehicle: VehicleWithNames;
+  photos: VehiclePhotoRow[];
+  related: VehicleWithNames[];
+  basePath: string;
+  /** 「汽車專區」或「機車專區」*/
+  listHeading: string;
+}
+
+const { vehicle: v, photos, related, basePath, listHeading } = Astro.props;
+
+const fullName = `${v.make_title} ${v.model_title}`;
+const price = v.price.toLocaleString('en-US');
+const createdDate = v.created_at.slice(0, 10).replace(/-/g, '/');
+
+const GALLERY_OPTS = '{"navAsThumbnails": true, "navContainer": "#thumbnails", "gutter": 12, "responsive": {"0":{"controls": false},"500":{"controls": true}}}';
+const RELATED_OPTS = '{"items": 3, "responsive": {"0":{"items":1, "gutter": 16},"500":{"items":2, "gutter": 18},"900":{"items":3, "gutter": 20}, "1100":{"gutter": 24}}}';
+---
+
+<Site
+  title={`${fullName}｜TSURUMARU 日本二手車`}
+  description={v.summary?.slice(0, 150) ?? `${fullName} ${v.year ?? ''} 年式，售價 ￥${price}。`}
+  image={photoUrl(v.id, v.photo)}
+>
+<!-- Page content-->
+<div class="container mt-5 mb-md-4 py-5">
+    <!-- Breadcrumb-->
+    <nav class="mb-3 pt-md-3" aria-label="Breadcrumb">
+        <ol class="breadcrumb breadcrumb-light">
+            <li class="breadcrumb-item"><a href="/">Home</a></li>
+            <li class="breadcrumb-item"><a href={basePath}>{listHeading}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{fullName}</li>
+        </ol>
+    </nav>
+    <!-- Title + Sharing-->
+    <div class="d-sm-flex align-items-end align-items-md-center justify-content-between position-relative mb-4" style="z-index: 1025;">
+        <div class="me-3">
+            <h1 class="h2 text-dark mb-md-0">{fullName}</h1>
+            <div class="d-md-none">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="h3 mb-0 text-dark">￥{price}</div>
+
+                </div>
+                <div class="d-flex flex-wrap align-items-center text-dark mb-2">
+                    <div class="text-nowrap border-end border-light pe-3 me-3"><i class="fi-dashboard fs-lg opacity-70 me-2"></i><span class="align-middle">{v.mileage} 公里</span></div>
+                    <div class="text-nowrap"><i class="fi-map-pin fs-lg opacity-70 me-2"></i><span class="align-middle">{v.location}</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="text-nowrap pt-3 pt-sm-0">
+            <div class="dropdown d-inline-block" data-bs-toggle="tooltip" title="Share">
+                <button class="btn btn-icon btn-translucent-light btn-xs rounded-circle ms-2 mb-sm-2" type="button" data-bs-toggle="dropdown"><i class="fi-share"></i></button>
+                <div class="dropdown-menu dropdown-menu-dark dropdown-menu-end my-1">
+                    <button class="dropdown-item" type="button"><i class="fi-facebook fs-base opacity-75 me-2"></i>Facebook</button>
+                    <button class="dropdown-item" type="button"><i class="fi-twitter fs-base opacity-75 me-2"></i>Twitter</button>
+                    <button class="dropdown-item" type="button"><i class="fi-instagram fs-base opacity-75 me-2"></i>Instagram</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-7">
+            <!-- Gallery-->
+            {photos.length > 0 && (
+                <Fragment>
+                <div class="tns-carousel-wrapper">
+                    <div class="tns-slides-count text-dark">
+                        <i class="fi-image fs-lg me-2"></i>
+                        <div class="ps-1"><span class="tns-current-slide fs-5 fw-bold"></span><span class="fs-5 fw-bold">/</span><span class="tns-total-slides fs-5 fw-bold"></span></div>
+                    </div>
+                    <div class="tns-carousel-inner" data-carousel-options={GALLERY_OPTS}>
+                        {photos.map((p) => (
+                            <div><img class="rounded-3" src={photoUrl(v.id, p.photo)} alt={p.title ?? ''}></div>
+                        ))}
+                    </div>
+                </div>
+                <ul class="tns-thumbnails" id="thumbnails">
+                    {photos.map((p) => (
+                        <li class="tns-thumbnail"><img src={photoUrl(v.id, p.photo)} alt={p.title ?? ''}></li>
+                    ))}
+                </ul>
+                </Fragment>
+            )}
+            <!-- Specs-->
+            <div class="py-3 mb-3">
+                <h2 class="h4 text-dark mb-4">規格Specifications</h2>
+                <div class="row text-dark">
+                    <div class="col-sm-6 col-md-12 col-lg-6">
+                        <ul class="list-unstyled">
+                            <li class="mb-2"><strong>製造年份:</strong><span class="opacity-70 ms-1">{v.year}</span></li>
+                            <li class="mb-2"><strong>里程:</strong><span class="opacity-70 ms-1">{v.mileage} 公里</span></li>
+                            <li class="mb-2"><strong>車身類型:</strong><span class="opacity-70 ms-1">{label(VEHICLE_BODY, v.vehicle_type)}</span></li>
+                            <li class="mb-2"><strong>發動機:</strong><span class="opacity-70 ms-1">{v.engine}</span></li>
+                            <li class="mb-2"><strong>傳動:</strong><span class="opacity-70 ms-1">{label(TRANSMISSION, v.transmission)}</span></li>
+                        </ul>
+                    </div>
+                    <div class="col-sm-6 col-md-12 col-lg-6">
+                        <ul class="list-unstyled">
+                            <li class="mb-2">
+                                <strong>燃料類型:</strong><span class="opacity-70 ms-1">
+                                    {label(FUEL, v.fuel)}
+                                </span>
+                            </li>
+                            <li class="mb-2"><strong>Cc：</strong><span class="opacity-70 ms-1">{v.cc}</span></li>
+                            <li class="mb-2"><strong>外觀顏色：</strong><span class="opacity-70 ms-1">{v.exterior}</span></li>
+                            <li class="mb-2"><strong>內飾顏色：</strong><span class="opacity-70 ms-1">{v.interior}</span></li>
+                            <li class="mb-2"><strong>VIN:</strong><span class="opacity-70 ms-1">{v.vin}</span></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Description-->
+            <div class="pb-4 mb-3">
+                <h2 class="h4 text-dark pt-4 mt-3">車輛描述</h2>
+                <p class="text-dark opacity-70 mb-1" set:html={sanitizeHtml(v.description)}></p>
+            </div>
+            <!-- Post meta-->
+            <div class="d-flex flex-wrap border-top border-light fs-sm text-dark pt-4 pb-5 pb-md-2">
+                <div class="border-end border-light pe-3 me-3"><span class="opacity-70">發佈時間: <strong>{createdDate}</strong></span></div>
+                <div class="opacity-70">觀看次數： <strong>{v.views.toLocaleString('en-US')}</strong></div>
+            </div>
+        </div>
+        <!-- Sidebar-->
+        <div class="col-md-5 pt-5 pt-md-0" style="margin-top: -6rem;">
+            <div class="sticky-top pt-5">
+                <div class="d-none d-md-block pt-5">
+                    <div class="h3 text-dark">￥{price}</div>
+                    <div class="d-flex align-items-center text-dark pb-4 mb-2">
+                        <div class="text-nowrap border-end border-light pe-3 me-3"><i class="fi-dashboard fs-lg opacity-70 me-2"></i><span class="align-middle">{v.mileage} 公里</span></div>
+                        <div class="text-nowrap"><i class="fi-map-pin fs-lg opacity-70 me-2"></i><span class="align-middle">{v.location}</span></div>
+                    </div>
+                </div>
+
+                <div class="pt-4 mt-2">
+                    <button class="btn btn-outline-dark btn-lg px-4 mb-3" type="button"><i class="fi-phone me-2"></i>+81-3-62612685</button><br><a class="btn btn-primary btn-lg" href="mailto:glory.inamori@tsurumarucorp.co.jp" data-bs-toggle="collapse"><i class="fi-chat-left me-2"></i>傳送訊息</a>
+                </div>
+                <div class="pt-4 mt-2">
+                    <p>{v.summary}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{related.length > 0 && (
+    <Fragment>
+    <!-- Related posts (Carousel)-->
+    <section class="container pt-sm-5 pt-4 pb-3">
+        <div class="align-items-center justify-content-between mb-3 mb-sm-4 pb-2">
+            <h2 class="h3 text-dark mb-3 mb-sm-0 text-center">You may be interested in</h2>
+            <p class="text-dark mb-3 mb-sm-0 text-center">你可能感興趣</p>
+        </div>
+        <div class="tns-carousel-wrapper tns-controls-outside-xxl tns-nav-outside tns-carousel-light">
+            <div class="tns-carousel-inner p-sm-3" data-carousel-options={RELATED_OPTS}>
+                {related.map((item) => <VehicleCard vehicle={item} basePath={basePath} />)}
+            </div>
+        </div>
+    </section>
+    </Fragment>
+)}
+</Site>

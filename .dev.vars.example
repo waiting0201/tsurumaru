@@ -1,0 +1,8 @@
+# 本機開發用的祕密範本。
+# 複製為 .dev.vars 後填入實際值 —— .dev.vars 已列入 .gitignore，絕不進版控。
+# 正式環境改用：npx wrangler secret put <NAME>
+#
+# 見 docs/08-security.md 與 docs/05-workflows.md#4-祕密管理
+
+# 後台 session cookie 的簽章金鑰（隨機長字串）
+SESSION_SECRET=""

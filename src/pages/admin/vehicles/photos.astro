@@ -1,0 +1,151 @@
+---
+// 車輛相簿。合併舊版的 CarPhotos / MotorPhotos 兩套重複程式。
+//
+// ⚠️ 舊版的權限樹根本沒有相簿節點，導致這個功能對所有一般管理員都是壞的
+//    （會撞到一個沒有解釋的 404）。搬遷時已補上 Photos 節點。
+//    見 docs/08-security.md#相簿管理對一般管理員完全不可用
+import Admin from '../../../layouts/Admin.astro';
+import { requireView, requireCan, requirePost, handleGuard, str, int } from '../../../lib/admin-guard';
+import { csrfToken, RESOURCES, can } from '../../../lib/auth';
+import { getVehicleRow, listPhotos, insertPhoto, updatePhotoMeta, deletePhotoRow, getPhoto, updateSorts } from '../../../lib/admin-db';
+import {
+  putVehiclePhoto, deleteVehiclePhoto, newPhotoFilename, photoUrl,
+  ALLOWED_IMAGE_TYPES, MAX_UPLOAD_BYTES, sniffImageType,
+} from '../../../lib/media';
+import { VEHICLE_TYPE } from '../../../lib/enums';
+
+export const prerender = false;
+
+const vehicleId = Astro.url.searchParams.get('id') ?? '';
+
+let admin, csrf, vehicle, photos: Awaited<ReturnType<typeof listPhotos>> = [];
+let mayAdd = false, mayUpdate = false, mayDelete = false;
+let err = '', msg = '';
+
+try {
+  admin = await requireView(Astro, RESOURCES.PHOTOS);
+  csrf = await csrfToken(admin.sessionId);
+
+  vehicle = vehicleId ? await getVehicleRow(vehicleId) : null;
+  if (!vehicle) return new Response('404 — 找不到該車輛。', { status: 404 });
+
+  if (Astro.request.method === 'POST') {
+    const form = await requirePost(Astro, admin);
+    const action = str(form, 'action');
+
+    if (action === 'upload') {
+      await requireCan(Astro, RESOURCES.PHOTOS, 'add');
+      const files = form.getAll('photos').filter((f): f is File => f instanceof File && f.size > 0);
+      if (!files.length) err = '請選擇要上傳的圖片。';
+      let added = 0;
+      for (const file of files) {
+        if (file.size > MAX_UPLOAD_BYTES) { err = `有檔案超過 ${(MAX_UPLOAD_BYTES / 1024 / 1024).toFixed(0)} MB 上限，已略過。`; continue; }
+        const buf = await file.arrayBuffer();
+        const sniffed = sniffImageType(buf);
+        if (!sniffed || !ALLOWED_IMAGE_TYPES[sniffed]) { err = '有檔案不是支援的圖片格式，已略過。'; continue; }
+        const name = newPhotoFilename(`x.${ALLOWED_IMAGE_TYPES[sniffed]}`);
+        await putVehiclePhoto(vehicle.id, name, buf, sniffed);
+        await insertPhoto({
+          id: crypto.randomUUID().toLowerCase(), vehicle_id: vehicle.id,
+          photo: name, title: null, sort: (photos.length + added) * 5,
+        });
+        added++;
+      }
+      if (added) msg = `已上傳 ${added} 張。`;
+    } else if (action === 'update') {
+      await requireCan(Astro, RESOURCES.PHOTOS, 'update');
+      const ids = form.getAll('photo_id').map(String);
+      const titles = form.getAll('photo_title').map(String);
+      const sorts = form.getAll('photo_sort').map((v) => Number(v));
+      for (let i = 0; i < ids.length; i++) {
+        const row = await getPhoto(ids[i]);
+        if (row && row.vehicle_id === vehicle.id) {
+          await updatePhotoMeta(ids[i], titles[i]?.trim() || null, sorts[i] ?? 0);
+        }
+      }
+      msg = '已更新。';
+    } else if (action === 'delete') {
+      await requireCan(Astro, RESOURCES.PHOTOS, 'delete');
+      const id = str(form, 'photo_id');
+      const row = id ? await getPhoto(id) : null;
+      // 必須確認這張相片確實屬於這台車，不能只信任表單傳來的 id
+      if (!row || row.vehicle_id !== vehicle.id) err = '找不到該相片。';
+      else { await deleteVehiclePhoto(vehicle.id, row.photo); await deletePhotoRow(row.id); msg = '已刪除。'; }
+    }
+  }
+
+  [photos, mayAdd, mayUpdate, mayDelete] = await Promise.all([
+    listPhotos(vehicle.id),
+    can(admin, RESOURCES.PHOTOS, 'add'),
+    can(admin, RESOURCES.PHOTOS, 'update'),
+    can(admin, RESOURCES.PHOTOS, 'delete'),
+  ]);
+} catch (e) {
+  return handleGuard(e);
+}
+
+const backHref = `/admin/vehicles?type=${vehicle.type}`;
+const frontHref = `${vehicle.type === VEHICLE_TYPE.CAR ? '/cars' : '/bikes'}/${vehicle.id}`;
+---
+<Admin title="車輛相簿" admin={admin} csrf={csrf}>
+  {err && <div class="msg err">{err}</div>}
+  {msg && <div class="msg ok">{msg}</div>}
+
+  <div class="panel">
+    <div class="actions">
+      <a class="btn secondary sm" href={backHref}>← 回車輛列表</a>
+      <a class="btn secondary sm" href={`/admin/vehicles/edit?type=${vehicle.type}&id=${vehicle.id}`}>編輯車輛</a>
+      <a class="btn secondary sm" href={frontHref} target="_blank">前台檢視</a>
+      <span class="muted">目前 {photos.length} 張</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <form method="post">
+      <input type="hidden" name="csrf" value={csrf}>
+      <input type="hidden" name="action" value="update">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th style="width:6rem">預覽</th><th>圖說</th><th style="width:7rem">排序</th><th style="width:6rem">操作</th></tr></thead>
+          <tbody>
+            {photos.map((p) => (
+              <tr>
+                <td><img class="thumb" src={photoUrl(vehicle.id, p.photo)} alt="" loading="lazy"></td>
+                <td>
+                  <input type="hidden" name="photo_id" value={p.id}>
+                  <input type="text" name="photo_title" value={p.title ?? ''} disabled={!mayUpdate}>
+                </td>
+                <td><input type="number" name="photo_sort" value={p.sort} disabled={!mayUpdate} style="width:5rem"></td>
+                <td>
+                  {mayDelete && (
+                    <button class="btn danger sm" type="submit" name="action" value="delete"
+                      formnovalidate onclick={`this.form.elements['photo_id'].value='${p.id}';return confirm('確定刪除這張相片？')`}>刪除</button>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {photos.length === 0 && <tr><td colspan="4" class="muted">還沒有相片。</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      {mayUpdate && photos.length > 0 && (
+        <div style="margin-top:1rem"><button class="btn" type="submit">儲存圖說與排序</button></div>
+      )}
+    </form>
+  </div>
+
+  {mayAdd && (
+    <div class="panel">
+      <h2 style="font-size:1.1rem;margin-top:0">上傳相片</h2>
+      <form method="post" enctype="multipart/form-data">
+        <input type="hidden" name="csrf" value={csrf}>
+        <input type="hidden" name="action" value="upload">
+        <input name="photos" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple required>
+        <p class="muted" style="margin:.5rem 0">
+          可一次選多張。接受 JPG／PNG／WebP／GIF，單檔上限 {(MAX_UPLOAD_BYTES / 1024 / 1024).toFixed(0)} MB。
+        </p>
+        <button class="btn" type="submit">上傳</button>
+      </form>
+    </div>
+  )}
+</Admin>

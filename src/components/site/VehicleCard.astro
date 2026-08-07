@@ -1,0 +1,62 @@
+---
+// 車輛卡片。對應 Index.cshtml 的輪播卡片與 Cars/Bikes.cshtml 的列表卡片。
+//
+// 舊版把汽車與機車的卡片逐行複製了兩份，只差在連結路徑與圖片目錄。
+// 這裡合併為單一元件（docs/04-conventions.md#合併汽車與機車的重複邏輯），
+// DOM 與 class 完全照搬。
+import { photoUrl } from '../../lib/media';
+import { FUEL, TRANSMISSION, label } from '../../lib/enums';
+import type { VehicleWithNames } from '../../lib/types';
+
+interface Props {
+  vehicle: VehicleWithNames;
+  /** '/cars' 或 '/bikes' */
+  basePath: string;
+}
+
+const { vehicle: v, basePath } = Astro.props;
+const href = `${basePath}/${v.id}`;
+
+// 舊版這裡直接輸出 @car.Transmission，也就是把資料庫存的代碼（"1"–"4"）
+// 原封不動印在畫面上，使用者看到的是「3」而不是「自手排」。
+// 燃料在隔壁兩格卻有正確對照，可見是遺漏而非刻意。這裡改為顯示對照文字。
+const transmissionLabel = label(TRANSMISSION, v.transmission);
+const fuelLabel = label(FUEL, v.fuel);
+---
+
+<div>
+    <div class="card card-light card-hover h-100 shadow">
+        <div class="card-img-top card-img-hover">
+            <a class="img-overlay" href={href}></a>
+            <img src={photoUrl(v.id, v.photo)} alt="Image" loading="lazy">
+        </div>
+        <div class="card-body">
+            <div class="d-flex align-items-center justify-content-between pb-1">
+                <span class="fs-sm text-dark me-3">{v.year}</span>
+            </div>
+            <h3 class="h6 mb-1"><a class="nav-link-muted" href={href}>{v.make_title} {v.model_title}</a></h3>
+            <div class="text-secondary fw-bold mb-1">￥{v.price.toLocaleString('en-US')}</div>
+            <div class="fs-sm text-dark opacity-70"><i class="fi-map-pin me-1"></i>{v.location}</div>
+        </div>
+        <div class="card-footer border-0 pt-0">
+            <div class="border-top border-light pt-3">
+                <div class="row g-2">
+                    <div class="col me-sm-1">
+                        <div class="bg-secondary rounded text-center w-100 h-100 p-2"><i class="fi-dashboard d-block h4 text-dark mb-0 mx-center"></i><span class="fs-xs text-dark">{v.mileage} 公里</span></div>
+                    </div>
+                    <div class="col me-sm-1">
+                        <div class="bg-secondary rounded text-center w-100 h-100 p-2"><i class="fi-gearbox d-block h4 text-dark mb-0 mx-center"></i><span class="fs-xs text-dark">{transmissionLabel}</span></div>
+                    </div>
+                    <div class="col">
+                        <div class="bg-secondary rounded text-center w-100 h-100 p-2">
+                            <i class="fi-petrol d-block h4 text-dark mb-0 mx-center"></i>
+                            <span class="fs-xs text-dark">
+                                {fuelLabel}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

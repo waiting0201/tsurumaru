@@ -1,0 +1,29 @@
+---
+// 對應 Views/Home/CarDetail.cshtml（舊網址 /Home/CarDetail?VehicleID={guid}）
+import VehicleDetailPage from '../../components/site/VehicleDetailPage.astro';
+import { getVehicle, getVehiclePhotos, getFeatured, bumpViews } from '../../lib/db';
+import { VEHICLE_TYPE } from '../../lib/enums';
+
+const { id } = Astro.params;
+const vehicle = id ? await getVehicle(id) : null;
+
+// 找不到，或該 id 其實是機車 → 404（舊版不檢查類型，直接顯示）
+if (!vehicle || vehicle.type !== VEHICLE_TYPE.CAR) {
+  return new Response(null, { status: 404, statusText: 'Not Found' });
+}
+
+const [photos, related] = await Promise.all([
+  getVehiclePhotos(vehicle.id),
+  getFeatured(VEHICLE_TYPE.CAR, 6),
+]);
+
+// 非阻塞累加瀏覽次數。舊版宣告了 Views 欄位卻從未寫入。
+Astro.locals.cfContext?.waitUntil?.(bumpViews(vehicle.id));
+---
+<VehicleDetailPage
+  vehicle={vehicle}
+  photos={photos}
+  related={related}
+  basePath="/cars"
+  listHeading="汽車專區"
+/>

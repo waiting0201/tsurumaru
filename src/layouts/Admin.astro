@@ -1,0 +1,100 @@
+---
+// 後台版型 —— 全新設計，不沿用舊 SmartAdmin 樣板（ADR-0005）。
+// 語意化 HTML + 少量自訂 CSS，不引入 UI 框架、不引入 jQuery 外掛。
+//
+// 選單寫在程式碼裡，不再從 permissions 表動態產生 —— 舊版讓那張表同時
+// 扮演選單與權限兩種角色，職責混淆。
+import type { AuthedAdmin } from '../lib/auth';
+
+interface Props {
+  title: string;
+  admin: AuthedAdmin;
+  csrf: string;
+}
+
+const { title, admin } = Astro.props;
+const path = Astro.url.pathname;
+
+const NAV = [
+  { href: '/admin', label: '總覽' },
+  { href: '/admin/vehicles', label: '車輛' },
+  { href: '/admin/makes', label: '車廠' },
+  { href: '/admin/models', label: '車型' },
+  { href: '/admin/admins', label: '管理員' },
+];
+const active = (href: string) => (href === '/admin' ? path === '/admin' : path.startsWith(href));
+---
+
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{title}｜Tsurumaru 後台</title>
+  <style>
+    :root {
+      --bg: #f6f7f9; --panel: #fff; --ink: #1c1e21; --muted: #6b7280;
+      --line: #e5e7eb; --brand: #1f6feb; --danger: #b42318; --ok: #067647;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink);
+      font: 15px/1.6 system-ui, -apple-system, "Noto Sans TC", sans-serif; }
+    a { color: var(--brand); }
+    header.top { display: flex; align-items: center; gap: 1.5rem; padding: .75rem 1.25rem;
+      background: var(--panel); border-bottom: 1px solid var(--line); }
+    .brand { font-weight: 700; letter-spacing: .02em; }
+    nav.main { display: flex; gap: .25rem; flex: 1; flex-wrap: wrap; }
+    nav.main a { padding: .4rem .75rem; border-radius: 6px; text-decoration: none; color: var(--ink); }
+    nav.main a[aria-current] { background: var(--brand); color: #fff; }
+    .who { color: var(--muted); font-size: .875rem; display: flex; align-items: center; gap: .75rem; }
+    main { max-width: 1100px; margin: 1.5rem auto; padding: 0 1.25rem; }
+    h1 { font-size: 1.4rem; margin: 0 0 1rem; }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 1.25rem; margin-bottom: 1.25rem; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: .6rem .5rem; border-bottom: 1px solid var(--line); vertical-align: middle; }
+    th { font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .table-wrap { overflow-x: auto; }
+    label { display: block; font-size: .875rem; color: var(--muted); margin-bottom: .25rem; }
+    input[type=text], input[type=number], input[type=password], input[type=email], select, textarea {
+      width: 100%; padding: .5rem .6rem; border: 1px solid var(--line); border-radius: 6px;
+      font: inherit; background: #fff; }
+    textarea { min-height: 7rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+    .btn { display: inline-block; padding: .45rem .9rem; border-radius: 6px; border: 1px solid var(--brand);
+      background: var(--brand); color: #fff; font: inherit; cursor: pointer; text-decoration: none; }
+    .btn.secondary { background: #fff; color: var(--ink); border-color: var(--line); }
+    .btn.danger { background: #fff; color: var(--danger); border-color: var(--danger); }
+    .btn.sm { padding: .25rem .6rem; font-size: .85rem; }
+    .actions { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+    .msg { padding: .6rem .9rem; border-radius: 6px; margin-bottom: 1rem; }
+    .msg.err { background: #fdf2f0; color: var(--danger); border: 1px solid #f4c7c0; }
+    .msg.ok { background: #f0fdf4; color: var(--ok); border: 1px solid #bbf7d0; }
+    .muted { color: var(--muted); font-size: .875rem; }
+    .pager { display: flex; gap: .35rem; margin-top: 1rem; flex-wrap: wrap; }
+    .pager a, .pager span { padding: .3rem .6rem; border: 1px solid var(--line); border-radius: 6px;
+      text-decoration: none; color: var(--ink); background: #fff; }
+    .pager span[aria-current] { background: var(--brand); color: #fff; border-color: var(--brand); }
+    .thumb { width: 64px; height: 44px; object-fit: cover; border-radius: 4px; background: #eee; }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <span class="brand">TSURUMARU 後台</span>
+    <nav class="main">
+      {NAV.map((n) => <a href={n.href} aria-current={active(n.href) ? 'page' : undefined}>{n.label}</a>)}
+    </nav>
+    <div class="who">
+      <span>{admin.name ?? admin.username}{admin.isSuper ? '（超級管理員）' : ''}</span>
+      <form method="post" action="/admin/logout" style="margin:0">
+        <input type="hidden" name="csrf" value={Astro.props.csrf}>
+        <button class="btn secondary sm" type="submit">登出</button>
+      </form>
+    </div>
+  </header>
+  <main>
+    <h1>{title}</h1>
+    <slot />
+  </main>
+</body>
+</html>

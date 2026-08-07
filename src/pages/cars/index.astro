@@ -1,0 +1,6 @@
+---
+// 對應 reference/old/Tsurumaru/Views/Home/Cars.cshtml（舊網址 /Home/Cars）
+import VehicleListPage from '../../components/site/VehicleListPage.astro';
+import { VEHICLE_TYPE } from '../../lib/enums';
+---
+<VehicleListPage type={VEHICLE_TYPE.CAR} basePath="/cars" heading="汽車專區" carOnly={true} />

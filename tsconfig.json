@@ -1,0 +1,25 @@
+{
+  "extends": "astro/tsconfigs/strict",
+  "include": [
+    ".astro/types.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.astro",
+    "worker-configuration.d.ts"
+  ],
+  "exclude": [
+    "dist",
+    "node_modules",
+    // 舊 ASP.NET 專案唯讀，絕不納入建置流程（紅線三）
+    "reference"
+  ],
+  "compilerOptions": {
+    "strictNullChecks": true,
+    // binding 與 runtime 型別由 `npx wrangler types` 產生到 worker-configuration.d.ts，
+    // 已取代 @cloudflare/workers-types，不要再手動指定 types
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  }
+}

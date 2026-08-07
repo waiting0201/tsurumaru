@@ -1,0 +1,51 @@
+---
+// 對應舊版的 @Html.Pager(...)（PagedList.Mvc）。
+//
+// ⚠️ 這是全站唯一無法逐位元對照的 markup —— 舊版的分頁 DOM 由 .NET 的
+//    PagedList 函式庫在執行期產生，不存在於 .cshtml 中，無法直接照抄。
+//    這裡依 Cars.cshtml 的 PagingOptions 重建：
+//      UlElementClasses         → pagination pagination-dark mb-0
+//      LinkToPreviousPageFormat → <i class="fi-chevron-left"></i>
+//      LinkToNextPageFormat     → <i class="fi-chevron-right"></i>
+//      DisplayLinkToFirstPage / LastPage / PageCount / TotalItemCount → false
+import { pageHref } from '../../lib/filters';
+
+interface Props {
+  basePath: string;
+  params: URLSearchParams;
+  page: number;
+  totalPages: number;
+}
+
+const { basePath, params, page, totalPages } = Astro.props;
+
+// 舊版 PagedList 預設顯示當前頁前後各若干頁
+const WINDOW = 5;
+let start = Math.max(1, page - Math.floor(WINDOW / 2));
+const end = Math.min(totalPages, start + WINDOW - 1);
+start = Math.max(1, end - WINDOW + 1);
+
+const pages = Array.from({ length: end - start + 1 }, (_, i) => start + i);
+---
+
+{totalPages > 1 && (
+<div class="">
+    <ul class="pagination pagination-dark mb-0">
+        <li class={page <= 1 ? 'disabled PagedList-skipToPrevious' : 'PagedList-skipToPrevious'}>
+            {page <= 1
+              ? <a href="#"><i class="fi-chevron-left"></i></a>
+              : <a href={pageHref(basePath, params, page - 1)}><i class="fi-chevron-left"></i></a>}
+        </li>
+        {pages.map((n) => (
+            <li class={n === page ? 'active' : ''}>
+                {n === page ? <a href="#">{n}</a> : <a href={pageHref(basePath, params, n)}>{n}</a>}
+            </li>
+        ))}
+        <li class={page >= totalPages ? 'disabled PagedList-skipToNext' : 'PagedList-skipToNext'}>
+            {page >= totalPages
+              ? <a href="#"><i class="fi-chevron-right"></i></a>
+              : <a href={pageHref(basePath, params, page + 1)}><i class="fi-chevron-right"></i></a>}
+        </li>
+    </ul>
+</div>
+)}

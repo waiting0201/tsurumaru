@@ -1,0 +1,52 @@
+---
+// 對應 reference/old/Tsurumaru/Views/Shared/_Footer.cshtml
+// DOM 與 class 完全照搬（紅線一）。
+// data-carousel-options 的 HTML 實體保持原樣 —— tiny-slider 依賴它初始化。
+---
+
+<!-- Footer-->
+<footer class="footer bg-faded-light mt-sm-5">
+    <!-- CTA carousel-->
+    <section class="container pt-4 bg-secondary rounded">
+        <div class="tns-carousel-wrapper">
+            <div class="tns-carousel-inner d-block d-md-flex" data-carousel-options="{&quot;controlsContainer&quot;: &quot;#external-controls&quot;, &quot;nav&quot;: false, &quot;gutter&quot;: 20, &quot;autoHeight&quot;: true}">
+
+                <!-- Slide 2-->
+                <div>
+                    <div class="card card-body p-sm-5 card-light h-100">
+                        <div class="row align-items-center py-3 py-sm-0">
+                            <div class="col-md-6 mb-4 pb-3 mb-md-0 pb-md-0 text-center text-md-start">
+                                <h6 class="text-dark opacity-70 ">鶴丸株式会社<br>TSURUMARU Co., LTＤ<br>日本國東京都千代田区三番町２０－２ Park Life 604</h6>
+                                <h2 class="text-dark"><i class="fi-phone me-2"></i>+81-3-6261-2685</h2>
+                                <p class="fs-sm text-dark opacity-70 pb-md-4">營業時間：AM 09：00 - PM18：00 (日本時間) / 休息：週六、週日、國定假日</p>
+                                <a class="btn btn-primary btn-sm ms-2 order-lg-3" href="https://tsurumarucorp.co.jp/" target="_blank">鶴丸株式会社 不動產</a>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="row row-cols-sm-3 row-cols-md-2 row-cols-lg-3 gy-4 gx-3 gx-sm-4">
+                                    <div class="col">
+                                        <div class="d-table bg-white rounded-3 p-4 mx-auto mb-3"><img class="d-block m-sm-2" src="/content/img/car-finder/icons/buyers.svg" width="56" alt="Vetted buyers"></div>
+                                        <div class="fw-bold text-center text-body ">值得信賴</div>
+                                    </div>
+                                    <div class="col">
+                                        <div class="d-table bg-white rounded-3 p-4 mx-auto mb-3"><img class="d-block m-sm-2" src="/content/img/car-finder/icons/check.svg" width="56" alt="Smart tools"></div>
+                                        <div class="fw-bold text-center text-body ">專業服務</div>
+                                    </div>
+                                    <div class="col">
+                                        <div class="d-table bg-white rounded-3 p-4 mx-auto mb-3"><img class="d-block m-sm-2" src="/content/img/car-finder/icons/handshake.svg" width="56" alt="Handshake"></div>
+                                        <div class="fw-bold text-center text-body ">合理報價</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <div class="container d-lg-flex align-items-center justify-content-between fs-sm pb-3">
+        <div class="d-flex flex-wrap justify-content-center order-lg-2 mb-3"><a class="nav-link nav-link-muted fw-normal" href="/map">交通資訊</a><a class="nav-link nav-link-muted fw-normal" href="/privacy">隱私權及安全政策</a></div>
+        <p class="text-center text-lg-start order-lg-1 mb-lg-0"><span class="text-dark opacity-50">COPYRIGHT © 2021 TSURUMARU CO., LTD. ALL RIGHTS RESERVED.</span></p>
+    </div>
+</footer>

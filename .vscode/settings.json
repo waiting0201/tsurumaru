@@ -1,0 +1,23 @@
+{
+  // reference/old/ 是舊版 ASP.NET MVC (.NET Framework) 系統，僅供閱讀參考，
+  // 在 macOS + dotnet 10 環境下本來就無法建置，不要讓 VS Code 對它做分析。
+
+  // C# Dev Kit：不要自動載入 Tsurumaru.sln（錯誤訊息的主要來源）
+  "dotnet.defaultSolution": "disable",
+
+  // OmniSharp（舊版 C# 擴充套件）：不要自動搜尋 .sln / .csproj
+  "omnisharp.autoStart": false,
+  "omnisharp.disableMSBuildDiagnosticWarning": true,
+
+  // 不要監看這個資料夾，減少 CPU 與檔案事件
+  "files.watcherExclude": {
+    "**/reference/old/**": true
+  },
+
+  // 檔案總管仍看得到，但排除建置產物
+  "files.exclude": {
+    "**/reference/old/**/bin": true,
+    "**/reference/old/**/obj": true,
+    "**/reference/old/packages": true
+  }
+}

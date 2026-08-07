@@ -1,0 +1,219 @@
+---
+// 汽車／機車列表頁的共用實作。
+// 對應 Views/Home/Cars.cshtml 與 Views/Home/Bikes.cshtml —— 這兩份舊 view
+// 幾乎逐行相同，只差在文案、路徑與三個篩選區塊，合併於此
+// （docs/04-conventions.md#合併汽車與機車的重複邏輯）。
+//
+// DOM 與 class 完全照搬（紅線一）。表單改用 GET，讓篩選條件留在網址上、
+// 可分享也可加入書籤 —— 屬於「表單 action／name 對應新 query 參數」的允許範圍。
+import Site from '../../layouts/Site.astro';
+import Pagination from './Pagination.astro';
+import { photoUrl } from '../../lib/media';
+import { FUEL, TRANSMISSION, EXTERIOR_COLORS, DRIVELINE, label } from '../../lib/enums';
+import { listVehicles, getMakes } from '../../lib/db';
+import { parseFilters, parsePage } from '../../lib/filters';
+
+interface Props {
+  /** 1=汽車 2=機車 */
+  type: number;
+  /** '/cars' 或 '/bikes' */
+  basePath: string;
+  /** 「汽車專區」或「機車專區」*/
+  heading: string;
+  /** 機車沒有傳動／燃料／變速器三個篩選區塊 */
+  carOnly: boolean;
+}
+
+const { type, basePath, heading, carOnly } = Astro.props;
+
+const params = Astro.url.searchParams;
+const filters = parseFilters(params);
+const page = parsePage(params);
+
+const [result, makes] = await Promise.all([
+  listVehicles(type, filters, page, carOnly),
+  getMakes(type),
+]);
+
+const sel = (name: string, v: string) => params.getAll(name).includes(v);
+---
+
+<Site title={`${heading}｜TSURUMARU 日本二手車`} description={`TSURUMARU ${heading} — 日本進口中古車輛一覽，可依品牌、車齡、價位與外觀顏色篩選。`}>
+<!-- Page content-->
+<!-- Page container-->
+<div class="container mt-5 mb-md-4 py-5">
+    <div class="row py-md-1">
+        <!-- Filers sidebar (Offcanvas on mobile)-->
+        <div class="col-lg-3 p-4 mt-sm-5  bg-secondary rounded ">
+            <div class="offcanvas offcanvas-start offcanvas-collapse" id="filters-sidebar">
+                <form id="form" method="get" action={basePath}>
+                    <input type="hidden" name="p" value="1">
+                    <div class="offcanvas-header bg-transparent d-flex d-lg-none align-items-center">
+                        <h2 class="h5 text-light mb-0">Filters</h2>
+                        <button class="btn-close btn-close-white" type="button" data-bs-dismiss="offcanvas"></button>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <div class="w-70 pe-2"><input class="form-control" type="text" name="K" placeholder="關鍵字..." value={filters.k ?? ''}></div>
+                        <div class="w-30 pe-2"><button class="btn btn-primary w-90 float-sm-end" type="submit">Search</button></div>
+                    </div>
+                    <div class="offcanvas-body py-lg-4">
+                        <div class="pb-4 mb-2">
+                            <h3 class="h6 text-dark">品牌 &amp; 型號</h3>
+                            <select class="form-select form-select-dark mb-2" id="VehicleMake" name="Make">
+                                <option value="">請選擇品牌</option>
+                                {makes.map((m) => <option value={m.id}>{m.title}</option>)}
+                            </select>
+                            <select class="form-select form-select-dark mb-1" id="VehicleModel" name="VehicleModelID"></select>
+                        </div>
+                        <div class="pb-4 mb-2">
+                            <h3 class="h6 text-dark">車齡</h3>
+                            <select class="form-select form-select-dark w-100" id="Year" name="Year">
+                                <option value="">請選擇車齡</option>
+                                <option value="1" selected={filters.year === '1'}>1年以內</option>
+                                <option value="2" selected={filters.year === '2'}>1-3年</option>
+                                <option value="3" selected={filters.year === '3'}>3-5年</option>
+                                <option value="4" selected={filters.year === '4'}>5-10年</option>
+                                <option value="5" selected={filters.year === '5'}>10年以上</option>
+                            </select>
+                        </div>
+                        <div class="pb-4 mb-2">
+                            <h3 class="h6 text-dark">價位</h3>
+                            <div class="range-slider range-slider-dark mb-3" data-start-min="25000" data-start-max="65000" data-min="4000" data-max="100000" data-step="1000">
+                                <div class="range-slider-ui"></div>
+                                <div class="d-flex align-items-center">
+                                    <div class="w-50 pe-2">
+                                        <input class="form-control form-control-dark range-slider-value-min" type="text" name="PriceFrom" value={filters.priceFrom ?? ''}>
+                                    </div>
+                                    <div class="text-muted">&mdash;</div>
+                                    <div class="w-50 ps-2">
+                                        <input class="form-control form-control-dark range-slider-value-max" type="text" name="PriceTo" value={filters.priceTo ?? ''}>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {carOnly && (
+                        <Fragment>
+                        <div class="pb-4 mb-2">
+                            <h3 class="h6 text-dark">傳動系統</h3>
+                            {Object.entries(DRIVELINE).map(([v, text]) => (
+                            <div class="form-check form-check-dark">
+                                <input class="form-check-input" type="checkbox" id="Driveline" name="Driveline" value={v} checked={sel('Driveline', v)}>
+                                <label class="form-check-label fs-sm">{text}</label>
+                            </div>
+                            ))}
+                        </div>
+                        <div class="pb-4 mb-2">
+                            <h3 class="h6 text-dark">燃料類型</h3>
+                            {Object.entries(FUEL).map(([v, text]) => (
+                            <div class="form-check form-check-dark">
+                                <input class="form-check-input" type="checkbox" id="Fuel" name="Fuel" value={v} checked={sel('Fuel', v)}>
+                                <label class="form-check-label fs-sm">{text}</label>
+                            </div>
+                            ))}
+                        </div>
+                        <div class="pb-4 mb-1">
+                            <h3 class="h6 text-dark">變速器</h3>
+                            {Object.entries(TRANSMISSION).map(([v, text]) => (
+                            <div class="form-check form-check-dark">
+                                <input class="form-check-input" type="checkbox" id="Transmission" name="Transmission" value={v} checked={sel('Transmission', v)}>
+                                <label class="form-check-label fs-sm">{text}</label>
+                            </div>
+                            ))}
+                        </div>
+                        </Fragment>
+                        )}
+                        <div class="pb-4 mb-2">
+                            <h3 class="h6 text-dark">外觀顏色</h3>
+                            {EXTERIOR_COLORS.map((c) => (
+                            <div class="form-check form-check-dark">
+                                <input class="form-check-input" type="checkbox" id="Exterior" name="Exterior" value={c} checked={sel('Exterior', c)}>
+                                <label class="form-check-label fs-sm">{c}</label>
+                            </div>
+                            ))}
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <!-- Catalog grid view-->
+        <div class="col-lg-8">
+            <!-- Breadcrumb-->
+            <nav class="mb-3 pt-md-2 pt-lg-4" aria-label="Breadcrumb">
+                <ol class="breadcrumb breadcrumb-light">
+                    <li class="breadcrumb-item"><a href="/">Home</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">{heading}</li>
+                </ol>
+            </nav>
+            <!-- Page title-->
+            <div class="d-flex align-items-center justify-content-between pb-4 mb-2">
+                <h1 class="text-dark me-3 mb-0">{heading}</h1>
+                <!-- Sorting + View-->
+            </div>
+
+            <div class="row">
+                {result.items.map((item) => (
+                <Fragment>
+                <!-- Item-->
+                <div class="col-sm-6 mb-4">
+                    <div class="card card-dark card-hover h-100 shadow">
+                        <div class="card-img-top card-img-hover">
+                            <a class="img-overlay" href={`${basePath}/${item.id}`}></a>
+                            <img src={photoUrl(item.id, item.photo)} alt="Image" loading="lazy">
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between pb-1">
+                                <span class="fs-sm text-dark me-3">{item.year}</span>
+                            </div>
+                            <h3 class="h6 mb-1"><a class="nav-link-muted" href={`${basePath}/${item.id}`}>{item.make_title} {item.model_title}</a></h3>
+                            <div class="text-secondary fw-bold mb-1">￥{item.price.toLocaleString('en-US')}</div>
+                            <div class="fs-sm text-dark opacity-70"><i class="fi-map-pin me-1"></i>{item.location}</div>
+                        </div>
+                        <div class="card-footer border-0 pt-0">
+                            <div class="border-top border-light pt-3">
+                                <div class="row g-2">
+                                    <div class="col me-sm-1">
+                                        <div class="bg-secondary rounded text-center w-100 h-100 p-2"><i class="fi-dashboard d-block h4 text-dark mb-0 mx-center"></i><span class="fs-xs text-dark">{item.mileage} 公里</span></div>
+                                    </div>
+                                    <div class="col me-sm-1">
+                                        <div class="bg-secondary rounded text-center w-100 h-100 p-2"><i class="fi-gearbox d-block h4 text-dark mb-0 mx-center"></i><span class="fs-xs text-dark">{label(TRANSMISSION, item.transmission)}</span></div>
+                                    </div>
+                                    <div class="col">
+                                        <div class="bg-secondary rounded text-center w-100 h-100 p-2"><i class="fi-petrol d-block h4 text-dark mb-0 mx-center"></i><span class="fs-xs text-dark">
+                                            {label(FUEL, item.fuel)}
+                                        </span></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                </Fragment>
+                ))}
+            </div>
+            <!-- Sorting + Pagination-->
+            <div class="d-flex align-items-center justify-content-between py-2">
+                <Pagination basePath={basePath} params={params} page={result.page} totalPages={result.totalPages} />
+            </div>
+        </div>
+    </div>
+</div>
+
+<script slot="scripts" is:inline>
+    // 對應舊版 Cars.cshtml / Bikes.cshtml 的 @section scripts
+    // 端點改為回傳 JSON（舊版回傳拼接的 HTML 字串），由前端組出 option。
+    $(function () {
+        $("#VehicleMake").change(function () {
+            var vehiclemakeid = $(this).find("option:selected").val();
+            if (vehiclemakeid !== "") {
+                $.getJSON('/api/models', { makeId: vehiclemakeid }, function (res) {
+                    var $sel = $("#VehicleModel").find('option').remove().end();
+                    $sel.append($('<option>').attr('value', '').text('請選擇車型'));
+                    $.each(res.models, function (_, m) {
+                        $sel.append($('<option>').attr('value', m.id).text(m.title));
+                    });
+                });
+            }
+        });
+    });
+</script>
+</Site>

@@ -1,0 +1,69 @@
+# ─── 舊系統參考碼（不進版控）─────────────────────────────
+# reference/old/ 內含仍然有效的正式環境憑證（Azure SQL 帳密、後門帳號、
+# 明碼密碼欄位），一旦提交就會永久留在 git 歷史中。整個目錄排除。
+#
+# ⚠️ 後果：它是行為的真相來源，且是舊圖片唯一的一份。
+#    新複製的工作副本不會有這個目錄，docs/ 裡指向它的連結會失效。
+#    請在本機另行保留備份 —— 未追蹤的檔案救不回來。
+/reference/
+
+# ─── 作業系統 ────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+
+# ─── 編輯器 ──────────────────────────────────────────────
+# .vscode/settings.json 是刻意共用的（排除 reference/old 的 C# 分析），予以追蹤
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.swp
+
+# ─── Node ────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm/
+
+# ─── Astro ───────────────────────────────────────────────
+# 必須用開頭的 / 錨定在根目錄！未錨定的 dist/ 會連帶排除
+# reference/old/Tsurumaru/Scripts/vendor/*/dist/ 裡的 vendor 資產，
+# 而那些檔案是紅線一要求原樣搬運的對象。
+/.astro/
+/dist/
+
+# ─── Cloudflare / Wrangler ───────────────────────────────
+/.wrangler/
+# 🔴 祕密只進 wrangler secret 或 .dev.vars，且 .dev.vars 絕不進版控
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+worker-configuration.d.ts
+
+# ─── 環境變數 ────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.local
+
+# ─── 搬遷腳本的中繼產物 ──────────────────────────────────
+# 從舊資料庫匯出的原始資料與轉檔結果，可隨時重新產生，且可能很大
+scripts/src/
+scripts/out/
+*.sqlite
+*.sqlite3
+
+# ─── 測試與覆蓋率 ────────────────────────────────────────
+/coverage/
+/.nyc_output/
+
+# ─── 刻意「不」忽略 ──────────────────────────────────────
+# migrations/  D1 schema 變更史，必須追蹤
+# public/      從舊專案搬來的 theme.css 與 vendor 資產，必須追蹤
+#              （注意：/dist/ 等規則都刻意錨定在根目錄，
+#                避免誤傷 public/scripts/vendor/*/dist/）

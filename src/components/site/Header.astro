@@ -1,0 +1,27 @@
+---
+// 對應 reference/old/Tsurumaru/Views/Shared/_Header.cshtml
+// DOM 與 class 完全照搬（紅線一）。只把 @Url.Action(...) 換成新路徑。
+//
+// 註：舊版把 active 寫死在「回到首頁」上，所有頁面都一樣。
+// 這是原本的視覺呈現，照實保留。
+---
+
+<!-- Navbar-->
+<header class="navbar navbar-expand-lg navbar-light fixed-top" data-scroll-header>
+    <div class="container">
+        <!-- 檔名含 @，Cloudflare 的資產路由會把未編碼的 @ 307 轉到 %40。
+             這裡直接用編碼後的路徑，避免每次載入都多一次往返。 -->
+        <a class="navbar-brand me-3 me-xl-4" href="/"><img class="d-block" src="/content/img/logo/logo%402x.jpg" width="196" alt="Finder"></a>
+        <button class="navbar-toggler ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button><a class="btn btn-primary btn-sm ms-2 order-lg-3" href="tel:+81-3-62612685"><i class="fi-phone me-2"></i>Call</a>
+        <div class="collapse navbar-collapse order-lg-2" id="navbarNav">
+            <ul class="navbar-nav navbar-nav-scroll" style="max-height: 35rem;">
+                <!-- Menu items-->
+                <li class="nav-item active"><a class="nav-link" href="/">回到首頁<span>Home</span></a></li>
+                <li class="nav-item "><a class="nav-link" href="/cars">汽車專區<span>Cars</span></a></li>
+                <li class="nav-item "><a class="nav-link" href="/bikes">機車專區<span>Bikes</span></a></li>
+                <li class="nav-item"><a class="nav-link" href="/about">關於我們<span>About</span></a></li>
+                <li class="nav-item"><a class="nav-link" href="/map">交通資訊<span>Map</span></a></li>
+            </ul>
+        </div>
+    </div>
+</header>

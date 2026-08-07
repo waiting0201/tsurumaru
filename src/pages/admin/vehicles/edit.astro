@@ -1,0 +1,185 @@
+---
+// 車輛新增／編輯。合併舊版的 AddCars / EditCars / AddMotors / EditMotors 四個 action。
+//
+// 上傳與舊版的差異（docs/08-security.md）：
+//   • 副檔名白名單 + 驗證 magic bytes（不信任 Content-Type）
+//   • 大小上限
+//   • 檔名重新產生，不沿用使用者輸入
+import Admin from '../../../layouts/Admin.astro';
+import { requireView, requireCan, requirePost, handleGuard, str, int } from '../../../lib/admin-guard';
+import { csrfToken, RESOURCES } from '../../../lib/auth';
+import { getVehicleRow, insertVehicle, updateVehicle, modelsForType } from '../../../lib/admin-db';
+import {
+  putVehiclePhoto, deleteVehiclePhoto, newPhotoFilename,
+  ALLOWED_IMAGE_TYPES, MAX_UPLOAD_BYTES, sniffImageType, photoUrl,
+} from '../../../lib/media';
+import { VEHICLE_TYPE, VEHICLE_BODY, FUEL, DRIVELINE, TRANSMISSION, EXTERIOR_COLORS } from '../../../lib/enums';
+
+export const prerender = false;
+
+const type = Number(Astro.url.searchParams.get('type')) === VEHICLE_TYPE.BIKE ? VEHICLE_TYPE.BIKE : VEHICLE_TYPE.CAR;
+const editId = Astro.url.searchParams.get('id');
+const typeName = type === VEHICLE_TYPE.CAR ? '汽車' : '機車';
+
+let admin, csrf, models, vehicle = null;
+let err = '', msg = '';
+
+try {
+  admin = await requireView(Astro, RESOURCES.VEHICLES);
+  csrf = await csrfToken(admin.sessionId);
+  vehicle = editId ? await getVehicleRow(editId) : null;
+  if (editId && !vehicle) return new Response('404 — 找不到該車輛。', { status: 404 });
+
+  if (Astro.request.method === 'POST') {
+    await requireCan(Astro, RESOURCES.VEHICLES, vehicle ? 'update' : 'add');
+    const form = await requirePost(Astro, admin);
+
+    const modelId = int(form, 'vehicle_model_id');
+    const price = int(form, 'price');
+    if (!modelId) err = '請選擇車型。';
+    else if (price == null || price < 0) err = '請填寫有效的價格。';
+    else {
+      const id = vehicle?.id ?? crypto.randomUUID().toLowerCase();
+      let photoName = vehicle?.photo ?? '';
+
+      const file = form.get('photo');
+      if (file instanceof File && file.size > 0) {
+        if (file.size > MAX_UPLOAD_BYTES) {
+          err = `圖片超過上限 ${(MAX_UPLOAD_BYTES / 1024 / 1024).toFixed(0)} MB。`;
+        } else {
+          const buf = await file.arrayBuffer();
+          const sniffed = sniffImageType(buf);
+          if (!sniffed || !ALLOWED_IMAGE_TYPES[sniffed]) {
+            err = '只接受 JPG／PNG／WebP／GIF 圖片。';
+          } else {
+            const name = newPhotoFilename(`x.${ALLOWED_IMAGE_TYPES[sniffed]}`);
+            await putVehiclePhoto(id, name, buf, sniffed);
+            if (vehicle?.photo && vehicle.photo !== name) await deleteVehiclePhoto(id, vehicle.photo);
+            photoName = name;
+          }
+        }
+      }
+
+      if (!err && !photoName) err = '請上傳主圖。';
+
+      if (!err) {
+        const data = {
+          id, vehicle_model_id: modelId, type,
+          year: int(form, 'year'), fuel: int(form, 'fuel'), mileage: int(form, 'mileage'),
+          vehicle_type: str(form, 'vehicle_type') || null,
+          driveline: str(form, 'driveline') || null,
+          exterior: str(form, 'exterior') || null,
+          interior: str(form, 'interior') || null,
+          engine: str(form, 'engine') || null,
+          transmission: str(form, 'transmission') || null,
+          cc: int(form, 'cc'), location: str(form, 'location') || null, vin: str(form, 'vin') || null,
+          summary: str(form, 'summary') || null, description: str(form, 'description') || null,
+          photo: photoName, price, sort: int(form, 'sort') ?? 0,
+        };
+        if (vehicle) { await updateVehicle(data); }
+        else { await insertVehicle(data, new Date().toISOString().slice(0, 19) + 'Z'); }
+        return Astro.redirect(`/admin/vehicles?type=${type}`, 302);
+      }
+    }
+  }
+
+  models = await modelsForType(type);
+} catch (e) {
+  return handleGuard(e);
+}
+
+const v = vehicle;
+const val = (k: keyof NonNullable<typeof v>) => (v ? (v[k] ?? '') : '');
+---
+<Admin title={`${v ? '編輯' : '新增'}${typeName}`} admin={admin} csrf={csrf}>
+  {err && <div class="msg err">{err}</div>}
+  {msg && <div class="msg ok">{msg}</div>}
+
+  <form method="post" enctype="multipart/form-data">
+    <input type="hidden" name="csrf" value={csrf}>
+
+    <div class="panel">
+      <div class="grid">
+        <div>
+          <label for="model">車型</label>
+          <select id="model" name="vehicle_model_id" required>
+            <option value="">請選擇</option>
+            {models.map((m) => (
+              <option value={m.id} selected={v?.vehicle_model_id === m.id}>{m.make_title} — {m.title}</option>
+            ))}
+          </select>
+        </div>
+        <div><label for="year">出廠年份</label><input id="year" name="year" type="number" value={val('year')}></div>
+        <div><label for="price">價格（日圓）</label><input id="price" name="price" type="number" value={val('price')} required></div>
+        <div><label for="mileage">里程（公里）</label><input id="mileage" name="mileage" type="number" value={val('mileage')}></div>
+        <div><label for="cc">排氣量 Cc</label><input id="cc" name="cc" type="number" value={val('cc')}></div>
+        <div><label for="sort">排序</label><input id="sort" name="sort" type="number" value={v ? v.sort : 0}></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="grid">
+        <div>
+          <label for="vehicle_type">車種</label>
+          <select id="vehicle_type" name="vehicle_type">
+            <option value="">未指定</option>
+            {Object.entries(VEHICLE_BODY).map(([k, t]) => <option value={k} selected={v?.vehicle_type === k}>{t}</option>)}
+          </select>
+        </div>
+        <div>
+          <label for="fuel">燃料</label>
+          <select id="fuel" name="fuel">
+            <option value="">未指定</option>
+            {Object.entries(FUEL).map(([k, t]) => <option value={k} selected={String(v?.fuel ?? '') === k}>{t}</option>)}
+          </select>
+        </div>
+        <div>
+          <label for="driveline">傳動系統</label>
+          <select id="driveline" name="driveline">
+            <option value="">未指定</option>
+            {Object.entries(DRIVELINE).map(([k, t]) => <option value={k} selected={v?.driveline === k}>{t}</option>)}
+          </select>
+        </div>
+        <div>
+          <label for="transmission">變速器</label>
+          <select id="transmission" name="transmission">
+            <option value="">未指定</option>
+            {Object.entries(TRANSMISSION).map(([k, t]) => <option value={k} selected={v?.transmission === k}>{t}</option>)}
+          </select>
+        </div>
+        <div>
+          <label for="exterior">外觀顏色</label>
+          <select id="exterior" name="exterior">
+            <option value="">未指定</option>
+            {EXTERIOR_COLORS.map((c) => <option value={c} selected={v?.exterior === c}>{c}</option>)}
+          </select>
+        </div>
+        <div><label for="interior">內裝</label><input id="interior" name="interior" type="text" value={val('interior')}></div>
+        <div><label for="engine">發動機</label><input id="engine" name="engine" type="text" value={val('engine')}></div>
+        <div><label for="location">所在地</label><input id="location" name="location" type="text" value={val('location')}></div>
+        <div><label for="vin">車身號碼 VIN</label><input id="vin" name="vin" type="text" value={val('vin')}></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <label for="photo">主圖{v ? '（不選擇檔案則沿用現有主圖）' : ''}</label>
+      {v?.photo && <img class="thumb" style="width:160px;height:110px;margin-bottom:.5rem" src={photoUrl(v.id, v.photo)} alt="">}
+      <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif">
+      <p class="muted" style="margin:.5rem 0 0">
+        接受 JPG／PNG／WebP／GIF，上限 {(MAX_UPLOAD_BYTES / 1024 / 1024).toFixed(0)} MB。
+        本站不做即時縮圖，請盡量上傳已壓縮過的圖片（建議寬度 1600px 以內）。
+      </p>
+    </div>
+
+    <div class="panel">
+      <div><label for="summary">摘要</label><textarea id="summary" name="summary">{val('summary')}</textarea></div>
+      <div style="margin-top:1rem"><label for="description">詳細說明（可含 HTML）</label><textarea id="description" name="description" style="min-height:12rem">{val('description')}</textarea></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn" type="submit">{v ? '儲存' : '新增'}</button>
+      <a class="btn secondary" href={`/admin/vehicles?type=${type}`}>取消</a>
+      {v && <a class="btn secondary" href={`/admin/vehicles/photos?id=${v.id}`}>管理相簿</a>}
+    </div>
+  </form>
+</Admin>

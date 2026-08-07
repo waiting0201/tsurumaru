@@ -1,0 +1,42 @@
+---
+// 對應 reference/old/Tsurumaru/Views/Home/Map.cshtml
+// 純靜態內容，預先渲染。DOM 與 class 完全照搬（紅線一）。
+import Site from '../layouts/Site.astro';
+export const prerender = true;
+---
+
+<Site title="交通資訊｜TSURUMARU 日本二手車" description="鶴丸株式会社 交通資訊與所在位置。">
+<!-- Page content-->
+<div class="container pt-5 pb-lg-4 mt-5 mb-sm-2">
+    <!-- Breadcrumb-->
+    <nav class="mb-4 pt-md-3" aria-label="Breadcrumb">
+        <ol class="breadcrumb breadcrumb-light">
+            <li class="breadcrumb-item"><a href="/">Home</a></li>
+            <li class="breadcrumb-item active" aria-current="page">交通資訊</li>
+        </ol>
+    </nav>
+    <!-- Page content-->
+    <div class="row">
+        <!-- Sidebar-->
+        <aside class="col-lg-4 col-md-5 pe-xl-4 mb-5">
+            <!-- Account nav-->
+            <div class="card card-body card-light border-0 shadow-sm pb-1 me-lg-1">
+                <div class="d-flex d-md-block d-lg-flex align-items-start pt-lg-2 mb-4">
+                    <div class="pt-md-2 pt-lg-0 ps-3 ps-md-0 ps-lg-3">
+                        <h2 class="fs-lg text-dark mb-0">鶴丸株式會社<br>TSURUMARU</h2>
+                        <ul class="list-unstyled fs-sm mt-3 mb-0">
+                            <li class="nav-link-muted fw-normal"><i class="fi-map-pin opacity-60 me-2"></i>地址：<p>東京都千代田區三番町 20-2 三番町 Park Life No.604</p></li>
+                            <li class="nav-link-muted fw-normal"><i class="fi-map-pins opacity-60 me-2"></i>車站交通：<p>從JR總武線、中央線市谷站步行5分鐘<br>東京地鐵南北線　市谷站步行5分鐘</p></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </aside>
+        <!-- Content-->
+        <div class="col-lg-8 col-md-7 mb-5">
+            <h1 class="h2 text-dark"></h1>
+            <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3240.4344673976193!2d139.7382492155512!3d35.69092473704694!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x60188c6644879e3f%3A0xa3f2b487f971c997!2z44CSMTAyLTAwNzUg5p2x5Lqs6YO95Y2D5Luj55Sw5Yy65LiJ55Wq55S677yS77yQ4oiS77ySIOS4ieeVqueUuuODkeODvOOCr-ODqeOCpOODlQ!5e0!3m2!1sja!2sjp!4v1626773459720!5m2!1sja!2sjp" width="100%" height="450" style="border:0;" allowfullscreen="" loading="lazy"></iframe>
+        </div>
+    </div>
+</div>
+</Site>

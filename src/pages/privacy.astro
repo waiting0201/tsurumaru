@@ -1,0 +1,72 @@
+---
+// 對應 reference/old/Tsurumaru/Views/Home/Privacy.cshtml
+// 純靜態內容，預先渲染。DOM 與 class 完全照搬（紅線一）。
+import Site from '../layouts/Site.astro';
+export const prerender = true;
+---
+
+<Site title="隱私權及安全政策｜TSURUMARU 日本二手車" description="鶴丸株式会社 隱私權及安全政策。">
+<!-- Page content-->
+<div class="container pt-5 pb-lg-4 mt-5 mb-sm-2">
+    <!-- Breadcrumb-->
+    <nav class="mb-4 pt-md-3" aria-label="Breadcrumb">
+        <ol class="breadcrumb breadcrumb-light">
+            <li class="breadcrumb-item"><a href="/">Home</a></li>
+            <li class="breadcrumb-item active" aria-current="page">隱私權及安全政策</li>
+        </ol>
+    </nav>
+    <!-- Page content-->
+    <div class="row">
+        <!-- Content-->
+
+        <div class="col-lg-8 col-md-7 mb-5">
+            <h1>隱私權及安全政策</h1>
+            [個人信息的處理]
+
+
+            <p>下面，我們將通知您與我們的個人信息保護法相關的通信。</p>
+
+            <!-- 舊 Privacy.cshtml 這個 <p> 未閉合。瀏覽器會在下一個 <p> 前自動閉合，
+                 這裡顯式補上 </p>，渲染結果與舊站相同。 -->
+            <p>運營本網站的鶴丸株式會社（以下簡稱“本公司”）將遵守以下條款，以盡可能保護所有用戶的個人信息。</p>
+
+            <p>
+                1.個人信息的保護<br>
+                我們會以適當的方式管理用戶提供的個人信息，妥善管理和保護個人信息，不存在未經授權侵入或洩露的風險，我會努力做到的。
+            </p>
+
+            <p>
+                2. 個人信息的收集<br>
+                我們收集用戶提供的個人信息僅用於向用戶提供有用信息等合法目的。
+            </p>
+
+            <p>
+                3. 個人信息的使用<br>
+                我們只會將用戶提供的個人信息用於向用戶提供有用信息等合法目的。
+            </p>
+
+            <p>
+                4. 個人信息的<br>
+                披露未經用戶同意，我們不會向第三方披露或提供用戶提供的個人信息，除非有正當理由。即使在這種情況下，除非有正當理由，否則我們將努力防止第三方進一步披露、提供或洩露個人信息。
+            </p>
+
+            <p>
+                5. 用戶查詢<br>
+                如果您希望確認或更正用戶提供的個人信息，我們將在合理範圍內通過向我們的支持台提出請求來響應您的請求，我會這樣做。
+            </p>
+
+            <p>
+                6. 政策改進<br>
+                對於用戶個人信息的處理、管理和保護，我們將遵守相關法律法規，酌情審查本政策的內容，並努力改進。
+            </p>
+
+            <p>7. 個人信息保護聯絡</p>
+
+            <p>
+                株式會社鶴丸<br>
+                電話：03-6261-2685
+            </p>
+        </div>
+    </div>
+</div>
+</Site>

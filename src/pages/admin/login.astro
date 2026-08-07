@@ -1,0 +1,75 @@
+---
+// 後台登入。對應舊版 MainController.Login。
+//
+// 與舊版的差異（docs/08-security.md）：
+//   • 沒有任何硬編碼帳號 —— 唯一的驗證路徑是資料庫
+//   • 密碼比對走 PBKDF2 + 固定時間比較
+//   • 登入成功後換發新 session id（避免 session fixation）
+//   • 錯誤訊息不區分「帳號不存在」與「密碼錯誤」
+import { login, createSession, sessionCookie, getSessionAdmin } from '../../lib/auth';
+
+export const prerender = false;
+
+let error = '';
+const nextUrl = Astro.url.searchParams.get('next') ?? '/admin';
+const secure = Astro.url.protocol === 'https:';
+
+// 已登入就直接進後台
+const existing = await getSessionAdmin(Astro.request.headers.get('cookie'));
+if (existing && Astro.request.method === 'GET') {
+  return Astro.redirect('/admin', 302);
+}
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const username = String(form.get('username') ?? '').trim();
+  const password = String(form.get('password') ?? '');
+
+  if (!username || !password) {
+    error = '請輸入帳號與密碼。';
+  } else {
+    const admin = await login(username, password);
+    if (!admin) {
+      error = '帳號或密碼不正確。';
+    } else {
+      const session = await createSession(admin.id);
+      const target = nextUrl.startsWith('/admin') ? nextUrl : '/admin';
+      return new Response(null, {
+        status: 302,
+        headers: { location: target, 'set-cookie': sessionCookie(session.id, secure) },
+      });
+    }
+  }
+}
+---
+
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>登入｜Tsurumaru 後台</title>
+  <style>
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f6f7f9;
+      color: #1c1e21; font: 15px/1.6 system-ui, -apple-system, "Noto Sans TC", sans-serif; }
+    form { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 2rem; width: min(360px, 92vw); }
+    h1 { font-size: 1.25rem; margin: 0 0 1.5rem; }
+    label { display: block; font-size: .875rem; color: #6b7280; margin: 0 0 .25rem; }
+    input { width: 100%; padding: .55rem .65rem; border: 1px solid #e5e7eb; border-radius: 6px; font: inherit; margin-bottom: 1rem; }
+    button { width: 100%; padding: .55rem; border: 0; border-radius: 6px; background: #1f6feb; color: #fff; font: inherit; cursor: pointer; }
+    .err { background: #fdf2f0; color: #b42318; border: 1px solid #f4c7c0; padding: .6rem .9rem; border-radius: 6px; margin-bottom: 1rem; font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <form method="post">
+    <h1>TSURUMARU 後台</h1>
+    {error && <div class="err">{error}</div>}
+    <label for="username">帳號</label>
+    <input id="username" name="username" type="text" autocomplete="username" required autofocus>
+    <label for="password">密碼</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
+    <button type="submit">登入</button>
+  </form>
+</body>
+</html>

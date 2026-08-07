@@ -1,0 +1,47 @@
+---
+// 後台總覽。對應舊版 MainController.Index。
+import Admin from '../../layouts/Admin.astro';
+import { requireAdmin, handleGuard } from '../../lib/admin-guard';
+import { csrfToken } from '../../lib/auth';
+import { dashboardStats } from '../../lib/admin-db';
+
+export const prerender = false;
+
+let admin, csrf, stats;
+try {
+  admin = await requireAdmin(Astro);
+  csrf = await csrfToken(admin.sessionId);
+  stats = await dashboardStats();
+} catch (e) {
+  return handleGuard(e);
+}
+
+const cards = [
+  { label: '汽車', n: stats?.cars ?? 0, href: '/admin/vehicles?type=1' },
+  { label: '機車', n: stats?.bikes ?? 0, href: '/admin/vehicles?type=2' },
+  { label: '車廠', n: stats?.makes ?? 0, href: '/admin/makes' },
+  { label: '車型', n: stats?.models ?? 0, href: '/admin/models' },
+  { label: '相片', n: stats?.photos ?? 0, href: '/admin/vehicles' },
+  { label: '管理員', n: stats?.admins ?? 0, href: '/admin/admins' },
+];
+---
+<Admin title="總覽" admin={admin} csrf={csrf}>
+  <div class="panel">
+    <div class="grid">
+      {cards.map((c) => (
+        <a href={c.href} style="text-decoration:none;color:inherit">
+          <div style="border:1px solid var(--line);border-radius:8px;padding:1rem">
+            <div class="muted">{c.label}</div>
+            <div style="font-size:1.75rem;font-weight:700">{c.n.toLocaleString('en-US')}</div>
+          </div>
+        </a>
+      ))}
+    </div>
+  </div>
+  <div class="panel">
+    <p class="muted" style="margin:0">
+      前台網站：<a href="/" target="_blank">開啟</a>　·
+      車輛的新增與相片管理請從「車輛」進入。
+    </p>
+  </div>
+</Admin>

@@ -1,0 +1,28 @@
+{
+  "name": "tsurumaru",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro check && astro build",
+    "preview": "astro build && wrangler dev",
+    "deploy": "astro build && wrangler deploy",
+    "cf-typegen": "wrangler types",
+    "db:migrate": "wrangler d1 migrations apply tsurumaru --local",
+    "db:migrate:remote": "wrangler d1 migrations apply tsurumaru --remote"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "^14.2.0",
+    "astro": "^7.2.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@types/node": "^26.1.2",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.119.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

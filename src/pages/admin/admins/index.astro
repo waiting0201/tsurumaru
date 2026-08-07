@@ -1,0 +1,196 @@
+---
+// 管理員與權限維護。對應舊版 SettingMsController。
+//
+// 與舊版的差異：
+//   • 密碼存 PBKDF2 雜湊；後台看不到、也存不進明碼
+//   • 超級管理員改為資料庫旗標 is_super，取代硬編碼的 AdminID=888
+//   • 權限節點涵蓋相簿（舊版遺漏）
+import Admin from '../../../layouts/Admin.astro';
+import { requireView, requireCan, requirePost, handleGuard, str, int } from '../../../lib/admin-guard';
+import { csrfToken, RESOURCES, can, hashPassword } from '../../../lib/auth';
+import {
+  listAdmins, getAdmin, insertAdmin, updateAdminInfo, updateAdminPassword, deleteAdmin,
+  allPermissions, adminPermissionMap, setAdminPermissions,
+} from '../../../lib/admin-db';
+
+export const prerender = false;
+
+const MIN_PASSWORD = 12;
+
+let admin, csrf, admins, permissions, mayAdd = false, mayUpdate = false, mayDelete = false;
+let editing = null, editingPerms = new Map();
+let err = '', msg = '';
+
+try {
+  admin = await requireView(Astro, RESOURCES.ADMINS);
+  csrf = await csrfToken(admin.sessionId);
+
+  if (Astro.request.method === 'POST') {
+    const form = await requirePost(Astro, admin);
+    const action = str(form, 'action');
+
+    if (action === 'create') {
+      await requireCan(Astro, RESOURCES.ADMINS, 'add');
+      const username = str(form, 'username'), password = str(form, 'password');
+      if (!username || !password) err = '帳號與密碼都是必填。';
+      else if (password.length < MIN_PASSWORD) err = `密碼至少需要 ${MIN_PASSWORD} 個字元。`;
+      else {
+        try {
+          await insertAdmin(str(form, 'name') || null, username, await hashPassword(password),
+            str(form, 'email') || null, str(form, 'is_super') === '1' ? 1 : 0);
+          msg = `已新增管理員「${username}」。`;
+        } catch { err = '該帳號已存在。'; }
+      }
+    } else if (action === 'update') {
+      await requireCan(Astro, RESOURCES.ADMINS, 'update');
+      const id = int(form, 'id');
+      const target = id ? await getAdmin(id) : null;
+      if (!target) err = '找不到該管理員。';
+      else {
+        await updateAdminInfo(target.id, str(form, 'name') || null, str(form, 'email') || null,
+          str(form, 'is_super') === '1' ? 1 : 0);
+        const password = str(form, 'password');
+        if (password) {
+          if (password.length < MIN_PASSWORD) err = `密碼至少需要 ${MIN_PASSWORD} 個字元，密碼未變更。`;
+          else await updateAdminPassword(target.id, await hashPassword(password));
+        }
+        const perms = (await allPermissions()).map((p) => ({
+          permissionId: p.id,
+          add: form.get(`perm_${p.id}_add`) === '1',
+          update: form.get(`perm_${p.id}_update`) === '1',
+          delete: form.get(`perm_${p.id}_delete`) === '1',
+        }));
+        await setAdminPermissions(target.id, perms);
+        if (!err) msg = '已更新。';
+      }
+    } else if (action === 'delete') {
+      await requireCan(Astro, RESOURCES.ADMINS, 'delete');
+      const id = int(form, 'id');
+      if (!id) err = '找不到該管理員。';
+      else if (id === admin.id) err = '不能刪除自己的帳號。';
+      else { await deleteAdmin(id); msg = '已刪除。'; }
+    }
+  }
+
+  [admins, permissions, mayAdd, mayUpdate, mayDelete] = await Promise.all([
+    listAdmins(),
+    allPermissions(),
+    can(admin, RESOURCES.ADMINS, 'add'),
+    can(admin, RESOURCES.ADMINS, 'update'),
+    can(admin, RESOURCES.ADMINS, 'delete'),
+  ]);
+
+  const editId = Number(Astro.url.searchParams.get('edit')) || 0;
+  if (editId) {
+    editing = admins.find((a) => a.id === editId) ?? null;
+    if (editing) editingPerms = await adminPermissionMap(editing.id);
+  }
+} catch (e) {
+  return handleGuard(e);
+}
+
+const leaves = permissions.filter((p) => p.parent_id !== null);
+const parentName = (id: number | null) => permissions.find((p) => p.id === id)?.value ?? '';
+const permOf = (id: number) => editingPerms.get(id) ?? { add: false, update: false, delete: false };
+---
+<Admin title="管理員維護" admin={admin} csrf={csrf}>
+  {err && <div class="msg err">{err}</div>}
+  {msg && <div class="msg ok">{msg}</div>}
+
+  <div class="panel">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>帳號</th><th>姓名</th><th>Email</th><th>角色</th><th style="width:8rem">操作</th></tr></thead>
+        <tbody>
+          {admins.map((a) => (
+            <tr>
+              <td>{a.username}</td>
+              <td>{a.name}</td>
+              <td>{a.email}</td>
+              <td>{a.is_super === 1 ? '超級管理員' : '一般'}
+                {a.password_hash.startsWith('!') && <span class="muted"><br>尚未設定密碼</span>}
+              </td>
+              <td>{mayUpdate && <a class="btn secondary sm" href={`?edit=${a.id}`}>編輯</a>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {(mayUpdate && editing) && (
+    <div class="panel">
+      <h2 style="font-size:1.1rem;margin-top:0">編輯「{editing.username}」</h2>
+      <form method="post">
+        <input type="hidden" name="csrf" value={csrf}>
+        <input type="hidden" name="action" value="update">
+        <input type="hidden" name="id" value={editing.id}>
+        <div class="grid">
+          <div><label for="e-name">姓名</label><input id="e-name" name="name" type="text" value={editing.name ?? ''}></div>
+          <div><label for="e-email">Email</label><input id="e-email" name="email" type="email" value={editing.email ?? ''}></div>
+          <div><label for="e-pw">新密碼（留空表示不變更）</label><input id="e-pw" name="password" type="password" autocomplete="new-password" minlength={MIN_PASSWORD}></div>
+          <div><label for="e-super">角色</label>
+            <select id="e-super" name="is_super">
+              <option value="0" selected={editing.is_super !== 1}>一般管理員</option>
+              <option value="1" selected={editing.is_super === 1}>超級管理員（擁有全部權限）</option>
+            </select></div>
+        </div>
+
+        <h3 style="font-size:1rem;margin:1.5rem 0 .5rem">權限</h3>
+        <p class="muted" style="margin-top:0">超級管理員不受此表限制。</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>資源</th><th style="width:6rem">新增</th><th style="width:6rem">修改</th><th style="width:6rem">刪除</th></tr></thead>
+            <tbody>
+              {leaves.map((p) => {
+                const cur = permOf(p.id);
+                return (
+                  <tr>
+                    <td>{parentName(p.parent_id)} — {p.value}</td>
+                    <td><input type="checkbox" name={`perm_${p.id}_add`} value="1" checked={cur.add}></td>
+                    <td><input type="checkbox" name={`perm_${p.id}_update`} value="1" checked={cur.update}></td>
+                    <td><input type="checkbox" name={`perm_${p.id}_delete`} value="1" checked={cur.delete}></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="actions" style="margin-top:1rem">
+          <button class="btn" type="submit">儲存</button>
+          <a class="btn secondary" href="/admin/admins">取消</a>
+        </div>
+      </form>
+
+      {(mayDelete && editing.id !== admin.id) && (
+        <form method="post" style="margin-top:1rem" onsubmit="return confirm('確定刪除這個管理員帳號？')">
+          <input type="hidden" name="csrf" value={csrf}>
+          <input type="hidden" name="action" value="delete">
+          <input type="hidden" name="id" value={editing.id}>
+          <button class="btn danger sm" type="submit">刪除這個帳號</button>
+        </form>
+      )}
+    </div>
+  )}
+
+  {mayAdd && (
+    <div class="panel">
+      <h2 style="font-size:1.1rem;margin-top:0">新增管理員</h2>
+      <form method="post">
+        <input type="hidden" name="csrf" value={csrf}>
+        <input type="hidden" name="action" value="create">
+        <div class="grid">
+          <div><label for="c-username">帳號</label><input id="c-username" name="username" type="text" required></div>
+          <div><label for="c-name">姓名</label><input id="c-name" name="name" type="text"></div>
+          <div><label for="c-email">Email</label><input id="c-email" name="email" type="email"></div>
+          <div><label for="c-pw">密碼（至少 {MIN_PASSWORD} 字元）</label><input id="c-pw" name="password" type="password" autocomplete="new-password" minlength={MIN_PASSWORD} required></div>
+          <div><label for="c-super">角色</label>
+            <select id="c-super" name="is_super"><option value="0">一般管理員</option><option value="1">超級管理員</option></select></div>
+        </div>
+        <p class="muted">建立後可在編輯畫面指派細部權限。</p>
+        <div><button class="btn" type="submit">新增</button></div>
+      </form>
+    </div>
+  )}
+</Admin>

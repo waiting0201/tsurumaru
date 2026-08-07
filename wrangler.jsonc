@@ -1,0 +1,46 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "tsurumaru",
+
+  // adapter v14 走 @cloudflare/vite-plugin，會在建置「之前」解析 main，
+  // 因此不能指向尚未產生的 dist/_worker.js/index.js（會出現
+  // "main field doesn't point to an existing file"）。指向 adapter 的
+  // entrypoint，由它在建置時接上實際產物。
+  "main": "@astrojs/cloudflare/entrypoints/server",
+  "compatibility_date": "2026-08-07",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // adapter v14 的建置產物是 dist/server/（Worker 程式碼）與 dist/client/（靜態資產）。
+  // ⚠️ directory 必須指向 dist/client，指向 dist 會把 dist/server/ 的伺服器程式碼
+  //    當成靜態檔案公開送出。
+  "assets": {
+    "binding": "ASSETS",
+    "directory": "./dist/client",
+    // 預設的 auto-trailing-slash 會讓 /about 先 307 到 /about/ 再回應。
+    // 站內連結都是無斜線形式，改成直接回應以省掉每次的多餘往返。
+    "html_handling": "drop-trailing-slash"
+  },
+
+  "observability": {
+    "enabled": true
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "tsurumaru",
+      "database_id": "a2cb1fe4-10b5-4ddc-aa3d-207afa402c8b",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      "bucket_name": "tsurumaru-media"
+    }
+  ]
+
+  // 🔴 祕密絕不寫在這裡。正式環境用 `wrangler secret put`，
+  //    本機用 .dev.vars（已列入 .gitignore）。見 docs/08-security.md
+}

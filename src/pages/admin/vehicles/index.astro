@@ -1,0 +1,115 @@
+---
+// 車輛列表。合併舊版的 Cars / Motors 兩套重複程式。
+import Admin from '../../../layouts/Admin.astro';
+import { requireView, requireCan, requirePost, handleGuard, str, int } from '../../../lib/admin-guard';
+import { csrfToken, RESOURCES, can } from '../../../lib/auth';
+import { listVehiclesAdmin, deleteVehicle, getVehicleRow, updateSorts, listPhotos } from '../../../lib/admin-db';
+import { deleteVehiclePhoto } from '../../../lib/media';
+import { photoUrl } from '../../../lib/media';
+import { VEHICLE_TYPE } from '../../../lib/enums';
+
+export const prerender = false;
+
+const type = Number(Astro.url.searchParams.get('type')) === VEHICLE_TYPE.BIKE ? VEHICLE_TYPE.BIKE : VEHICLE_TYPE.CAR;
+const page = Math.max(1, Number(Astro.url.searchParams.get('p')) || 1);
+const typeName = type === VEHICLE_TYPE.CAR ? '汽車' : '機車';
+
+let admin, csrf, data, mayAdd = false, mayUpdate = false, mayDelete = false;
+let msg = '', err = '';
+
+try {
+  admin = await requireView(Astro, RESOURCES.VEHICLES);
+  csrf = await csrfToken(admin.sessionId);
+
+  if (Astro.request.method === 'POST') {
+    const form = await requirePost(Astro, admin);
+    const action = str(form, 'action');
+
+    if (action === 'delete') {
+      await requireCan(Astro, RESOURCES.VEHICLES, 'delete');
+      const id = str(form, 'id');
+      const v = id ? await getVehicleRow(id) : null;
+      if (!v) err = '找不到該車輛。';
+      else {
+        // 先刪 R2 上的檔案再刪資料列，避免留下孤兒物件
+        const photos = await listPhotos(v.id);
+        for (const p of photos) await deleteVehiclePhoto(v.id, p.photo);
+        if (v.photo) await deleteVehiclePhoto(v.id, v.photo);
+        await deleteVehicle(v.id);   // vehicle_photos 由 ON DELETE CASCADE 連帶刪除
+        msg = '已刪除該車輛與其所有相片。';
+      }
+    } else if (action === 'sort') {
+      await requireCan(Astro, RESOURCES.VEHICLES, 'update');
+      const ids = form.getAll('sort_id').map((v) => String(v));
+      const sorts = form.getAll('sort_value').map((v) => Number(v));
+      await updateSorts('vehicles', ids.map((id, i) => ({ id, sort: sorts[i] ?? 0 })));
+      msg = '排序已更新。';
+    }
+  }
+
+  [data, mayAdd, mayUpdate, mayDelete] = await Promise.all([
+    listVehiclesAdmin(type, page),
+    can(admin, RESOURCES.VEHICLES, 'add'),
+    can(admin, RESOURCES.VEHICLES, 'update'),
+    can(admin, RESOURCES.VEHICLES, 'delete'),
+  ]);
+} catch (e) {
+  return handleGuard(e);
+}
+
+const qs = (o: Record<string, string | number>) =>
+  '?' + new URLSearchParams({ type: String(type), ...Object.fromEntries(Object.entries(o).map(([k, v]) => [k, String(v)])) }).toString();
+const frontPath = type === VEHICLE_TYPE.CAR ? '/cars' : '/bikes';
+---
+<Admin title={`車輛維護 — ${typeName}`} admin={admin} csrf={csrf}>
+  {err && <div class="msg err">{err}</div>}
+  {msg && <div class="msg ok">{msg}</div>}
+
+  <div class="panel">
+    <div class="actions" style="margin-bottom:1rem">
+      <a class="btn secondary sm" href="/admin/vehicles?type=1">汽車</a>
+      <a class="btn secondary sm" href="/admin/vehicles?type=2">機車</a>
+      {mayAdd && <a class="btn sm" href={`/admin/vehicles/edit?type=${type}`}>新增{typeName}</a>}
+      <span class="muted">共 {data.total} 筆</span>
+    </div>
+
+    <form method="post">
+      <input type="hidden" name="csrf" value={csrf}>
+      <input type="hidden" name="action" value="sort">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th style="width:6rem">排序</th><th style="width:5rem">主圖</th><th>車輛</th><th>年份</th><th>價格</th><th style="width:14rem">操作</th></tr></thead>
+          <tbody>
+            {data.items.map((v) => (
+              <tr>
+                <td>
+                  <input type="hidden" name="sort_id" value={v.id}>
+                  <input type="number" name="sort_value" value={v.sort} disabled={!mayUpdate} style="width:5rem">
+                </td>
+                <td><img class="thumb" src={photoUrl(v.id, v.photo)} alt="" loading="lazy"></td>
+                <td>{v.make_title} {v.model_title}<br><span class="muted">{v.location}</span></td>
+                <td>{v.year}</td>
+                <td>￥{v.price.toLocaleString('en-US')}</td>
+                <td class="actions">
+                  {mayUpdate && <a class="btn secondary sm" href={`/admin/vehicles/edit?type=${type}&id=${v.id}`}>編輯</a>}
+                  <a class="btn secondary sm" href={`/admin/vehicles/photos?id=${v.id}`}>相簿</a>
+                  <a class="btn secondary sm" href={`${frontPath}/${v.id}`} target="_blank">前台</a>
+                </td>
+              </tr>
+            ))}
+            {data.items.length === 0 && <tr><td colspan="6" class="muted">沒有資料。</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      {mayUpdate && data.items.length > 0 && (
+        <div style="margin-top:1rem"><button class="btn" type="submit">儲存排序</button></div>
+      )}
+    </form>
+
+    <div class="pager">
+      {Array.from({ length: data.totalPages }, (_, i) => i + 1).map((n) => (
+        n === data.page ? <span aria-current="page">{n}</span> : <a href={qs({ p: n })}>{n}</a>
+      ))}
+    </div>
+  </div>
+</Admin>

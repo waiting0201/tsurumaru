@@ -1,0 +1,76 @@
+---
+// 對應 reference/old/Tsurumaru/Views/Home/About.cshtml
+// 純靜態內容，預先渲染。DOM 與 class 完全照搬（紅線一）。
+import Site from '../layouts/Site.astro';
+export const prerender = true;
+---
+
+<Site title="關於我們｜TSURUMARU 日本二手車" description="鶴丸株式会社 — 日本中古車與中古重機的引進與販售，關於我們。">
+<!-- Page content-->
+<div class="container pt-5 pb-lg-4 mt-5 mb-sm-2">
+    <!-- Breadcrumb-->
+    <nav class="mb-4 pt-md-3" aria-label="Breadcrumb">
+        <ol class="breadcrumb breadcrumb-light">
+            <li class="breadcrumb-item"><a href="/">Home</a></li>
+            <li class="breadcrumb-item active" aria-current="page">關於我們</li>
+        </ol>
+    </nav>
+
+
+    <!-- Page content-->
+    <div class="row">
+        <aside class="col-lg-4 col-md-5 pe-xl-4 mb-5">
+            <img src="/content/img/about/aboutus.png" class="d-block w-100" alt="...">
+        </aside>
+        <!-- Content-->
+        <div class="col-lg-8 col-md-7 mb-5">
+            <h1 class="h2 text-dark">關於我們</h1>
+            <div>
+                <ul class="list-unstyled">
+                    <li class="py-2">
+                        <h2 class="lead">業務概要</h2>
+                        中古汽車、機車代購<br>
+                        中古汽車、機車代標<br>
+                        中古汽車、機車零件代購<br>
+                        中古汽車、機車零件代標<br>
+                        中古機械器具代購及代標<br>
+                        中古汽車、機車代辦出口，配合協力廠商
+                    </li>
+                    <li class="py-2">
+                        <h2 class="lead">營銷</h2>
+                        以超越實際產品的方案，認真面對客戶的後顧之憂，解決之，實現我們的目標。
+                    </li>
+                    <li class="py-2">
+                        <h2 class="lead">顧客</h2>
+                        我們的目標是建立關係，使我們能夠在客戶的餘生中與他們互動。
+                    </li>
+                    <li class="py-2">
+                        <h2 class="lead">員工</h2>
+                        我們將繼續為所有員工提供成長機會。
+                    </li>
+                    <li class="py-2">
+                        <h2 class="lead">公司/地區/社會</h2>
+                        我們將實現一個可以描繪希望和未來的公司。我們將繼續為 SDG 的傳播做出貢獻。
+                    </li>
+                    <li class="py-2">
+                        <h2 class="lead">電話</h2>
+                        中文、日文 直通電話
+                        +81-3-6261-2685
+                    </li>
+                    <li class="py-2">
+                        <h2 class="lead">傳真</h2>
+                        +81-3-6256-9683
+                    </li>
+                    <li class="py-2">
+                        <h2 class="lead">古物営業法に基づく表示</h2>
+                        古物の売買や交換等の営業活動である古物営業を営む古物商は、古物営業法により、都道府県公安委員会の許可を得なければ営業する事が出来ません。 弊社では、古物営業法 全面施行後、下記の統一許可証番号を取得し、古物営業活動を行っております。
+                        <br><br>
+                        東京都公安委員会 第301002120427号
+                    </li>
+                </ul>
+
+            </div>
+        </div>
+    </div>
+</div>
+</Site>

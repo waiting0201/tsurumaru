@@ -1,0 +1,7 @@
+---
+// 對應 reference/old/Tsurumaru/Views/Home/Bikes.cshtml（舊網址 /Home/Bikes）
+// 機車沒有傳動／燃料／變速器三個篩選條件（舊版行為）
+import VehicleListPage from '../../components/site/VehicleListPage.astro';
+import { VEHICLE_TYPE } from '../../lib/enums';
+---
+<VehicleListPage type={VEHICLE_TYPE.BIKE} basePath="/bikes" heading="機車專區" carOnly={false} />

@@ -1,0 +1,27 @@
+---
+// 對應 Views/Home/BikeDetail.cshtml（舊網址 /Home/BikeDetail?VehicleID={guid}）
+import VehicleDetailPage from '../../components/site/VehicleDetailPage.astro';
+import { getVehicle, getVehiclePhotos, getFeatured, bumpViews } from '../../lib/db';
+import { VEHICLE_TYPE } from '../../lib/enums';
+
+const { id } = Astro.params;
+const vehicle = id ? await getVehicle(id) : null;
+
+if (!vehicle || vehicle.type !== VEHICLE_TYPE.BIKE) {
+  return new Response(null, { status: 404, statusText: 'Not Found' });
+}
+
+const [photos, related] = await Promise.all([
+  getVehiclePhotos(vehicle.id),
+  getFeatured(VEHICLE_TYPE.BIKE, 6),
+]);
+
+Astro.locals.cfContext?.waitUntil?.(bumpViews(vehicle.id));
+---
+<VehicleDetailPage
+  vehicle={vehicle}
+  photos={photos}
+  related={related}
+  basePath="/bikes"
+  listHeading="機車專區"
+/>
