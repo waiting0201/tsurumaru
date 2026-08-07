@@ -1,0 +1,343 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   後台樣式（ADR-0005）。Tailwind v4，只給 /admin 用。
+
+   ⚠️ 這支檔案只能被 layouts/Admin.astro 與 pages/admin/login.astro import。
+      前台任何頁面都不得 import —— Tailwind 的 preflight 會重置 theme.css，
+      違反紅線一。驗證：docs/06-verification.md#前台樣式零差異
+
+   source(none) + 明列 @source：預設的自動偵測會掃到 reference/old/ 的
+   .cshtml 與舊 css，把一堆舊 class 名當成 utility 產出來。這裡只掃後台。
+   ───────────────────────────────────────────────────────────────────────── */
+@import 'tailwindcss' source(none);
+
+@source '../layouts/Admin.astro';
+@source '../components/admin';
+@source '../pages/admin';
+
+/* ── 設計語彙 ──────────────────────────────────────────────────────────────
+   取自前台 theme.css 的品牌色，讓後台與前台看起來是同一間公司，
+   但版面語言不同：後台是「臺帳」—— 中古車行的在庫表單。
+   細框、無圓角、mono 小型大寫欄位標籤、數字一律等寬。
+   朱紅（前台主色）在這裡是唯一的重點色，只用在：目前所在的選單、
+   主要動作、必填記號。用多了就不是重點了。
+   ────────────────────────────────────────────────────────────────────────── */
+@theme {
+  --color-ink: #1f1b2d; /* 主文字、側欄 */
+  --color-ink-soft: #454056; /* 次要文字 */
+  /* 標籤與說明文字。前台的 #9691a4 在白底上只有 3.0:1，達不到 WCAG AA 的
+     4.5:1 —— 而後台的欄位標籤是要讀的內容，不是裝飾。改用同一組品牌色裡
+     較深的 #666276（5.9:1）。#9691a4 只留給純圖形（下拉箭頭）。 */
+  --color-ink-mute: #666276;
+  --color-paper: #f5f4f8; /* 頁面底 */
+  --color-rule: #ddd9e4; /* 細框線 */
+  --color-rule-soft: #ebe8f0; /* 表格列線 */
+  --color-stamp: #fd5631; /* 重點色（朱印） */
+  --color-stamp-ink: #d63c19; /* 朱紅的深色，用在文字上才夠對比 */
+  --color-go: #07c98b;
+  --color-stop: #f23c49;
+
+  /* 側欄自己的一組深色，比 ink 再深一階，才有「這是另一個平面」的感覺 */
+  --color-rail: #181523;
+  --color-rail-rule: #2e2840;
+  --color-rail-text: #b6b1c4;
+
+  --font-sans:
+    'Noto Sans TC', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
+    'PingFang TC', 'Microsoft JhengHei', sans-serif;
+  /* 數字、代碼、以及所有小型大寫欄位標籤。後台的個性都在這支字上。 */
+  --font-mono:
+    'DM Mono', ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace;
+
+  --radius-none: 0;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-paper text-ink font-sans text-[15px] leading-relaxed antialiased;
+  }
+
+  /* 數字一律等寬對齊 —— 價格、里程、排序在表格裡要能上下比對 */
+  :where(input[type='number'], td, th) {
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    @apply outline-stamp outline-2 outline-offset-2;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* ── 小型大寫標籤 ──────────────────────────────────────────────────────
+     整套後台的識別記號。中文字沒有大小寫，uppercase 對它無效，
+     但字距與字級會讓中英混排看起來是同一個層級。 */
+  .tm-eyebrow {
+    @apply font-mono text-[10px] font-medium tracking-[0.16em] text-ink-mute uppercase;
+  }
+
+  /* ── 面板 ─────────────────────────────────────────────────────────────── */
+  .tm-panel {
+    @apply border border-rule bg-white;
+  }
+
+  /* 面板抬頭：淡色帶狀，像表單上印好的欄位分區 */
+  .tm-panel-head {
+    @apply flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-rule bg-paper px-4 py-2.5;
+  }
+
+  .tm-panel-title {
+    @apply font-mono text-[11px] font-medium tracking-[0.14em] text-ink uppercase;
+  }
+
+  .tm-panel-body {
+    @apply p-4 sm:p-5;
+  }
+
+  /* ── 記入欄 ────────────────────────────────────────────────────────────
+     這是後台的簽名式元件：標籤印在框線內的左上角，值填在下面。
+     唯讀顯示與可編輯輸入用同一個外框，所以「看一筆資料」跟「改一筆資料」
+     長得一樣 —— 這個後台就是這台車的表單本身。 */
+  .tm-field {
+    @apply relative border border-rule bg-white px-2.5 pt-5 pb-1.5;
+    transition: border-color 120ms ease;
+  }
+
+  .tm-field > .tm-field-label {
+    @apply pointer-events-none absolute top-1.5 left-2.5 font-mono text-[10px] font-medium tracking-[0.12em] text-ink-mute uppercase;
+  }
+
+  /* 必填記號：右上角一點朱紅，不用星號去打斷標籤 */
+  .tm-field[data-required]::after {
+    content: '';
+    @apply absolute top-1.5 right-2 size-1.5 bg-stamp;
+  }
+
+  .tm-field :is(input, select, textarea) {
+    @apply w-full border-0 bg-transparent p-0 text-[15px] text-ink outline-none;
+    font-family: inherit;
+  }
+
+  .tm-field :is(input, textarea)::placeholder {
+    @apply text-ink-mute/80;
+  }
+
+  .tm-field textarea {
+    @apply block min-h-24 resize-y leading-relaxed;
+  }
+
+  .tm-field select {
+    @apply cursor-pointer appearance-none bg-no-repeat pr-6;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%239691a4' stroke-width='1.5'/%3E%3C/svg%3E");
+    background-position: right 0.1rem center;
+  }
+
+  .tm-field:focus-within {
+    @apply border-ink;
+    box-shadow: inset 0 0 0 1px var(--color-ink);
+  }
+
+  .tm-field:has(:disabled) {
+    @apply bg-paper;
+  }
+
+  .tm-field:has(:disabled) :is(input, select, textarea) {
+    @apply text-ink-mute;
+  }
+
+  /* 數字欄位（價格、年份、排氣量…）用等寬字，才對得齊 */
+  .tm-field--num :is(input, select) {
+    @apply font-mono;
+  }
+
+  .tm-field-hint {
+    @apply mt-1.5 text-[13px] leading-snug text-ink-mute;
+  }
+
+  /* ── 按鈕 ─────────────────────────────────────────────────────────────── */
+  .tm-btn {
+    @apply inline-flex cursor-pointer items-center justify-center gap-1.5 border border-ink bg-ink px-3.5 py-2 text-[14px] leading-none font-medium text-white;
+    transition:
+      background-color 120ms ease,
+      border-color 120ms ease,
+      color 120ms ease;
+  }
+
+  .tm-btn:hover {
+    @apply border-stamp bg-stamp;
+  }
+
+  .tm-btn--ghost {
+    @apply border-rule bg-white text-ink-soft;
+  }
+
+  .tm-btn--ghost:hover {
+    @apply border-ink bg-white text-ink;
+  }
+
+  .tm-btn--danger {
+    @apply border-rule bg-white text-stamp-ink;
+  }
+
+  .tm-btn--danger:hover {
+    @apply border-stop bg-stop text-white;
+  }
+
+  .tm-btn--sm {
+    @apply px-2.5 py-1.5 text-[13px];
+  }
+
+  .tm-btn:disabled {
+    @apply cursor-not-allowed border-rule bg-paper text-ink-mute;
+  }
+
+  /* ── 表格 ─────────────────────────────────────────────────────────────── */
+  .tm-table {
+    @apply w-full border-collapse text-[14px];
+  }
+
+  /* 不做 sticky thead —— 表格外面那層是 overflow-x-auto，它同時成為垂直
+     捲動容器，sticky 會黏在那個容器的頂端（也就是原位）而完全沒有效果。
+     每頁 20 筆，抬頭捲掉的距離有限。 */
+  .tm-table thead th {
+    @apply border-b border-rule bg-paper px-3 py-2 text-left font-mono text-[10px] font-medium tracking-[0.12em] whitespace-nowrap text-ink-mute uppercase;
+  }
+
+  .tm-table tbody td {
+    @apply border-b border-rule-soft px-3 py-2.5 align-middle;
+  }
+
+  .tm-table tbody tr:hover td {
+    @apply bg-paper;
+  }
+
+  /* 只有整個表格的最後一列不畫線。權限表用了多個 tbody 分組，
+     若對每個 tbody 都生效，組與組之間會缺一條線。 */
+  .tm-table tbody:last-child tr:last-child td {
+    @apply border-b-0;
+  }
+
+  /* 表格內的小輸入框：比 tm-field 輕，不需要標籤 */
+  .tm-cell-input {
+    @apply w-full border border-rule bg-white px-2 py-1 font-mono text-[13px] text-ink;
+  }
+
+  .tm-cell-input:focus {
+    @apply border-ink outline-none;
+  }
+
+  .tm-cell-input:disabled {
+    @apply bg-paper text-ink-mute;
+  }
+
+  /* ── 側欄 ─────────────────────────────────────────────────────────────── */
+  .tm-nav-link {
+    @apply relative flex items-center py-2.5 pr-3 pl-5 text-[14px] text-rail-text;
+    transition:
+      color 120ms ease,
+      background-color 120ms ease;
+  }
+
+  /* 每個項目左緣一道細線；目前所在的那一道亮成朱紅並加粗 */
+  .tm-nav-link::before {
+    content: '';
+    @apply absolute top-1.5 bottom-1.5 left-0 w-px bg-rail-rule;
+    transition:
+      width 120ms ease,
+      background-color 120ms ease;
+  }
+
+  .tm-nav-link:hover {
+    @apply bg-white/5 text-white;
+  }
+
+  .tm-nav-link[aria-current] {
+    @apply bg-white/5 font-medium text-white;
+  }
+
+  .tm-nav-link[aria-current]::before {
+    @apply w-0.5 bg-stamp;
+  }
+
+  /* 手機版選單鈕：真正的控制項是一個被視覺隱藏的 checkbox，focus 環要
+     顯示在看得見的 label 上，否則鍵盤使用者完全看不到焦點在哪。 */
+  #tm-nav:focus-visible ~ * label[for='tm-nav'] {
+    outline: 2px solid var(--color-stamp);
+    outline-offset: 2px;
+  }
+
+  /* ── 範圍切換（汽車／機車）──────────────────────────────────────────── */
+  .tm-scope {
+    @apply inline-flex border border-rule bg-white;
+  }
+
+  .tm-scope a {
+    @apply px-3 py-1.5 text-[13px] leading-none text-ink-soft;
+    transition:
+      background-color 120ms ease,
+      color 120ms ease;
+  }
+
+  .tm-scope a + a {
+    @apply border-l border-rule;
+  }
+
+  .tm-scope a:hover {
+    @apply bg-paper;
+  }
+
+  .tm-scope a[aria-current] {
+    @apply bg-ink font-medium text-white;
+  }
+
+  /* ── 訊息 ─────────────────────────────────────────────────────────────── */
+  .tm-flash {
+    @apply flex items-start gap-2.5 border-l-2 px-3.5 py-2.5 text-[14px];
+  }
+
+  .tm-flash--ok {
+    @apply border-go bg-go/8 text-ink;
+  }
+
+  .tm-flash--err {
+    @apply border-stop bg-stop/8 text-ink;
+  }
+
+  /* ── 分頁 ─────────────────────────────────────────────────────────────── */
+  .tm-page-link {
+    @apply inline-flex h-8 min-w-8 items-center justify-center border border-rule bg-white px-2 font-mono text-[13px] text-ink-soft;
+    transition:
+      border-color 120ms ease,
+      color 120ms ease;
+  }
+
+  .tm-page-link:hover {
+    @apply border-ink text-ink;
+  }
+
+  .tm-page-link[aria-current] {
+    @apply border-ink bg-ink font-medium text-white;
+  }
+
+  /* ── 縮圖 ─────────────────────────────────────────────────────────────── */
+  .tm-thumb {
+    @apply block bg-rule-soft object-cover;
+  }
+
+  /* ── 底部固定動作列 ────────────────────────────────────────────────────
+     長表單捲到一半也要能存檔，不用捲回去找按鈕。 */
+  .tm-actionbar {
+    @apply sticky bottom-0 z-20 -mx-4 flex flex-wrap items-center gap-2 border-t border-rule bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6;
+  }
+}

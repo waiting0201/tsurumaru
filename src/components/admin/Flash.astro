@@ -1,0 +1,26 @@
+---
+// 操作結果訊息。兩者都給就兩條都出（例如「上傳了 3 張，另有 1 張超過上限」）。
+interface Props {
+  err?: string;
+  msg?: string;
+}
+const { err, msg } = Astro.props;
+---
+
+{
+  (err || msg) && (
+    <div class="mb-4 space-y-2">
+      {/* 錯誤要打斷，成功不用 —— 兩者的 role 不同 */}
+      {err && (
+        <p class="tm-flash tm-flash--err" role="alert">
+          {err}
+        </p>
+      )}
+      {msg && (
+        <p class="tm-flash tm-flash--ok" role="status">
+          {msg}
+        </p>
+      )}
+    </div>
+  )
+}

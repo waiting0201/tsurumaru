@@ -1,10 +1,17 @@
 ---
 // 後台版型 —— 全新設計，不沿用舊 SmartAdmin 樣板（ADR-0005）。
-// 語意化 HTML + 少量自訂 CSS，不引入 UI 框架、不引入 jQuery 外掛。
+//
+// 設計方向：「臺帳」。中古車行的在庫表單 —— 細框線、無圓角、
+// 等寬字的小型大寫欄位標籤、數字一律對齊。朱紅（前台主色 #fd5631）
+// 是唯一的重點色，只用在目前所在的選單、主要動作、必填記號三處。
+// 版面語彙見 src/styles/admin.css。
 //
 // 選單寫在程式碼裡，不再從 permissions 表動態產生 —— 舊版讓那張表同時
 // 扮演選單與權限兩種角色，職責混淆。
+//
+// 排版全程不需要 JavaScript：手機版選單用 <details>，不引入任何前端狀態。
 import type { AuthedAdmin } from '../lib/auth';
+import '../styles/admin.css';
 
 interface Props {
   title: string;
@@ -12,89 +19,129 @@ interface Props {
   csrf: string;
 }
 
-const { title, admin } = Astro.props;
+const { title, admin, csrf } = Astro.props;
 const path = Astro.url.pathname;
 
+// code 是印在頁面抬頭的區段代號。它不是裝飾 —— 頁標題常常帶著
+// 「— 汽車」這類範圍後綴，代號讓人一眼確認自己在哪一個區段。
 const NAV = [
-  { href: '/admin', label: '總覽' },
-  { href: '/admin/vehicles', label: '車輛' },
-  { href: '/admin/makes', label: '車廠' },
-  { href: '/admin/models', label: '車型' },
-  { href: '/admin/admins', label: '管理員' },
+  { href: '/admin', code: 'OVERVIEW', label: '總覽' },
+  { href: '/admin/vehicles', code: 'VEHICLES', label: '車輛' },
+  { href: '/admin/makes', code: 'MAKES', label: '車廠' },
+  { href: '/admin/models', code: 'MODELS', label: '車型' },
+  { href: '/admin/admins', code: 'ADMINS', label: '管理員' },
 ];
+
 const active = (href: string) => (href === '/admin' ? path === '/admin' : path.startsWith(href));
+const current = NAV.find((n) => active(n.href));
+const who = admin.name ?? admin.username;
 ---
 
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-Hant-TW">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="robots" content="noindex, nofollow">
-  <title>{title}｜Tsurumaru 後台</title>
-  <style>
-    :root {
-      --bg: #f6f7f9; --panel: #fff; --ink: #1c1e21; --muted: #6b7280;
-      --line: #e5e7eb; --brand: #1f6feb; --danger: #b42318; --ok: #067647;
-    }
-    * { box-sizing: border-box; }
-    body { margin: 0; background: var(--bg); color: var(--ink);
-      font: 15px/1.6 system-ui, -apple-system, "Noto Sans TC", sans-serif; }
-    a { color: var(--brand); }
-    header.top { display: flex; align-items: center; gap: 1.5rem; padding: .75rem 1.25rem;
-      background: var(--panel); border-bottom: 1px solid var(--line); }
-    .brand { font-weight: 700; letter-spacing: .02em; }
-    nav.main { display: flex; gap: .25rem; flex: 1; flex-wrap: wrap; }
-    nav.main a { padding: .4rem .75rem; border-radius: 6px; text-decoration: none; color: var(--ink); }
-    nav.main a[aria-current] { background: var(--brand); color: #fff; }
-    .who { color: var(--muted); font-size: .875rem; display: flex; align-items: center; gap: .75rem; }
-    main { max-width: 1100px; margin: 1.5rem auto; padding: 0 1.25rem; }
-    h1 { font-size: 1.4rem; margin: 0 0 1rem; }
-    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 1.25rem; margin-bottom: 1.25rem; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { text-align: left; padding: .6rem .5rem; border-bottom: 1px solid var(--line); vertical-align: middle; }
-    th { font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-    .table-wrap { overflow-x: auto; }
-    label { display: block; font-size: .875rem; color: var(--muted); margin-bottom: .25rem; }
-    input[type=text], input[type=number], input[type=password], input[type=email], select, textarea {
-      width: 100%; padding: .5rem .6rem; border: 1px solid var(--line); border-radius: 6px;
-      font: inherit; background: #fff; }
-    textarea { min-height: 7rem; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
-    .btn { display: inline-block; padding: .45rem .9rem; border-radius: 6px; border: 1px solid var(--brand);
-      background: var(--brand); color: #fff; font: inherit; cursor: pointer; text-decoration: none; }
-    .btn.secondary { background: #fff; color: var(--ink); border-color: var(--line); }
-    .btn.danger { background: #fff; color: var(--danger); border-color: var(--danger); }
-    .btn.sm { padding: .25rem .6rem; font-size: .85rem; }
-    .actions { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
-    .msg { padding: .6rem .9rem; border-radius: 6px; margin-bottom: 1rem; }
-    .msg.err { background: #fdf2f0; color: var(--danger); border: 1px solid #f4c7c0; }
-    .msg.ok { background: #f0fdf4; color: var(--ok); border: 1px solid #bbf7d0; }
-    .muted { color: var(--muted); font-size: .875rem; }
-    .pager { display: flex; gap: .35rem; margin-top: 1rem; flex-wrap: wrap; }
-    .pager a, .pager span { padding: .3rem .6rem; border: 1px solid var(--line); border-radius: 6px;
-      text-decoration: none; color: var(--ink); background: #fff; }
-    .pager span[aria-current] { background: var(--brand); color: #fff; border-color: var(--brand); }
-    .thumb { width: 64px; height: 44px; object-fit: cover; border-radius: 4px; background: #eee; }
-  </style>
-</head>
-<body>
-  <header class="top">
-    <span class="brand">TSURUMARU 後台</span>
-    <nav class="main">
-      {NAV.map((n) => <a href={n.href} aria-current={active(n.href) ? 'page' : undefined}>{n.label}</a>)}
-    </nav>
-    <div class="who">
-      <span>{admin.name ?? admin.username}{admin.isSuper ? '（超級管理員）' : ''}</span>
-      <form method="post" action="/admin/logout" style="margin:0">
-        <input type="hidden" name="csrf" value={Astro.props.csrf}>
-        <button class="btn secondary sm" type="submit">登出</button>
-      </form>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="color-scheme" content="light" />
+    <title>{title}｜Tsurumaru 後台</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&display=swap"
+    />
+  </head>
+
+  <body>
+    <a
+      href="#main"
+      class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-ink focus:px-3 focus:py-2 focus:text-white"
+      >跳到主要內容</a
+    >
+
+    <!-- ── 側欄 ───────────────────────────────────────────────────────── -->
+    <aside
+      class="border-b border-rail-rule bg-rail lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:w-60 lg:flex-col lg:border-r lg:border-b-0"
+    >
+      <!-- checkbox 放在最前面，後面的兄弟元素才能用 peer-checked / focus-visible
+           選到（樣式見 admin.css）。桌機版側欄一直展開，它只在手機版有作用。 -->
+      <input type="checkbox" id="tm-nav" class="peer sr-only" />
+
+      <div class="flex items-center gap-3 px-5 py-4 lg:py-5">
+        <span class="mt-0.5 size-2.5 shrink-0 bg-stamp" aria-hidden="true"></span>
+        <span class="min-w-0">
+          <span class="block font-mono text-[15px] leading-none font-medium tracking-[0.18em] text-white"
+            >TSURUMARU</span
+          >
+          <span class="mt-1.5 block text-[11px] leading-none tracking-[0.2em] text-rail-text">在庫管理</span>
+        </span>
+
+        <!-- 手機版：選單開合。桌機版側欄一直在，就不需要這顆。 -->
+        <label
+          for="tm-nav"
+          class="ml-auto cursor-pointer border border-rail-rule px-2.5 py-1.5 font-mono text-[11px] tracking-[0.1em] text-rail-text lg:hidden"
+        >
+          選單
+        </label>
+      </div>
+
+      <div class="hidden peer-checked:block lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+        <nav class="pb-3 lg:flex-1 lg:pb-0" aria-label="後台主選單">
+          {
+            NAV.map((n) => (
+              <a class="tm-nav-link" href={n.href} aria-current={active(n.href) ? 'page' : undefined}>
+                <span class="mr-2 flex-1">{n.label}</span>
+                <span class="font-mono text-[10px] tracking-[0.12em] text-rail-text/70 uppercase">{n.code}</span>
+              </a>
+            ))
+          }
+        </nav>
+
+        <!-- 帳號與登出釘在側欄底部：它們是「離開」的動作，不該混在導覽裡 -->
+        <div class="mt-auto border-t border-rail-rule px-5 py-4">
+          <p class="truncate text-[13px] text-white" title={who}>{who}</p>
+          <p class="tm-eyebrow mt-1 text-rail-text/70">
+            {admin.isSuper ? '超級管理員' : '一般管理員'}
+          </p>
+          <div class="mt-3 flex items-center gap-3">
+            <form method="post" action="/admin/logout">
+              <input type="hidden" name="csrf" value={csrf} />
+              <button
+                type="submit"
+                class="cursor-pointer border border-rail-rule px-2.5 py-1.5 text-[13px] leading-none text-rail-text transition-colors hover:border-stamp hover:text-white"
+                >登出</button
+              >
+            </form>
+            <a
+              href="/"
+              target="_blank"
+              rel="noopener"
+              class="text-[13px] text-rail-text underline-offset-4 transition-colors hover:text-white hover:underline"
+              >開啟前台 ↗</a
+            >
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ── 內容 ───────────────────────────────────────────────────────── -->
+    <div class="min-h-screen lg:pl-60">
+      <header class="sticky top-0 z-30 border-b border-rule bg-white/95 px-4 py-3.5 backdrop-blur sm:px-6">
+        <div class="mx-auto flex max-w-6xl flex-wrap items-end gap-x-4 gap-y-2">
+          <div class="min-w-0">
+            {current && <p class="tm-eyebrow">{current.code}</p>}
+            <h1 class="mt-1 text-[19px] leading-tight font-medium tracking-tight text-ink">{title}</h1>
+          </div>
+          <div class="ml-auto flex flex-wrap items-center gap-2">
+            <slot name="actions" />
+          </div>
+        </div>
+      </header>
+
+      <main id="main" class="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-6">
+        <slot />
+      </main>
     </div>
-  </header>
-  <main>
-    <h1>{title}</h1>
-    <slot />
-  </main>
-</body>
+  </body>
 </html>

@@ -1,6 +1,10 @@
 ---
 // 車輛列表。合併舊版的 Cars / Motors 兩套重複程式。
 import Admin from '../../../layouts/Admin.astro';
+import Panel from '../../../components/admin/Panel.astro';
+import Flash from '../../../components/admin/Flash.astro';
+import Pager from '../../../components/admin/Pager.astro';
+import ScopeTabs from '../../../components/admin/ScopeTabs.astro';
 import { requireView, requireCan, requirePost, handleGuard, str } from '../../../lib/admin-guard';
 import { csrfToken, RESOURCES, can } from '../../../lib/auth';
 import { listVehiclesAdmin, deleteVehicle, getVehicleRow, updateSorts, listPhotos } from '../../../lib/admin-db';
@@ -60,56 +64,130 @@ try {
 const qs = (o: Record<string, string | number>) =>
   '?' + new URLSearchParams({ type: String(type), ...Object.fromEntries(Object.entries(o).map(([k, v]) => [k, String(v)])) }).toString();
 const frontPath = type === VEHICLE_TYPE.CAR ? '/cars' : '/bikes';
+
+// 車輛 id 是 uuid。前 8 碼足以在紙本與畫面之間對號，全長沒有人念得出來。
+const stub = (id: string) => id.slice(0, 8).toUpperCase();
 ---
+
 <Admin title={`車輛維護 — ${typeName}`} admin={admin} csrf={csrf}>
-  {err && <div class="msg err">{err}</div>}
-  {msg && <div class="msg ok">{msg}</div>}
+  <Fragment slot="actions">
+    <ScopeTabs base="/admin/vehicles" current={type} />
+    {mayAdd && <a class="tm-btn" href={`/admin/vehicles/edit?type=${type}`}>新增{typeName}</a>}
+  </Fragment>
 
-  <div class="panel">
-    <div class="actions" style="margin-bottom:1rem">
-      <a class="btn secondary sm" href="/admin/vehicles?type=1">汽車</a>
-      <a class="btn secondary sm" href="/admin/vehicles?type=2">機車</a>
-      {mayAdd && <a class="btn sm" href={`/admin/vehicles/edit?type=${type}`}>新增{typeName}</a>}
-      <span class="muted">共 {data.total} 筆</span>
-    </div>
+  <Flash err={err} msg={msg} />
 
-    <form method="post">
-      <input type="hidden" name="csrf" value={csrf}>
-      <input type="hidden" name="action" value="sort">
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th style="width:6rem">排序</th><th style="width:5rem">主圖</th><th>車輛</th><th>年份</th><th>價格</th><th style="width:14rem">操作</th></tr></thead>
-          <tbody>
-            {data.items.map((v) => (
-              <tr>
-                <td>
-                  <input type="hidden" name="sort_id" value={v.id}>
-                  <input type="number" name="sort_value" value={v.sort} disabled={!mayUpdate} style="width:5rem">
-                </td>
-                <td><img class="thumb" src={photoUrl(v.id, v.photo)} alt="" loading="lazy"></td>
-                <td>{v.make_title} {v.model_title}<br><span class="muted">{v.location}</span></td>
-                <td>{v.year}</td>
-                <td>￥{v.price.toLocaleString('en-US')}</td>
-                <td class="actions">
-                  {mayUpdate && <a class="btn secondary sm" href={`/admin/vehicles/edit?type=${type}&id=${v.id}`}>編輯</a>}
-                  <a class="btn secondary sm" href={`/admin/vehicles/photos?id=${v.id}`}>相簿</a>
-                  <a class="btn secondary sm" href={`${frontPath}/${v.id}`} target="_blank">前台</a>
-                </td>
-              </tr>
-            ))}
-            {data.items.length === 0 && <tr><td colspan="6" class="muted">沒有資料。</td></tr>}
-          </tbody>
-        </table>
+  <Panel title={`${typeName}在庫`} flush>
+    <span class="font-mono text-[12px] text-ink-mute" slot="head">{data.total.toLocaleString('en-US')} 筆</span>
+
+    {data.items.length === 0 ? (
+      <div class="px-5 py-12 text-center">
+        <p class="text-[15px] text-ink">還沒有{typeName}。</p>
+        <p class="tm-field-hint mx-auto max-w-xs">新增第一台，它就會出現在前台的{typeName}列表。</p>
+        {mayAdd && (
+          <a class="tm-btn mt-4" href={`/admin/vehicles/edit?type=${type}`}>新增{typeName}</a>
+        )}
       </div>
-      {mayUpdate && data.items.length > 0 && (
-        <div style="margin-top:1rem"><button class="btn" type="submit">儲存排序</button></div>
-      )}
-    </form>
+    ) : (
+      <form method="post">
+        <input type="hidden" name="csrf" value={csrf} />
+        <input type="hidden" name="action" value="sort" />
 
-    <div class="pager">
-      {Array.from({ length: data.totalPages }, (_, i) => i + 1).map((n) => (
-        n === data.page ? <span aria-current="page">{n}</span> : <a href={qs({ p: n })}>{n}</a>
-      ))}
-    </div>
-  </div>
+        <div class="overflow-x-auto">
+          <table class="tm-table">
+            <thead>
+              <tr>
+                <th class="w-20">排序</th>
+                <th class="w-24">主圖</th>
+                <th>車輛</th>
+                <th class="w-20">年份</th>
+                <th class="w-32">價格</th>
+                <th class="w-56 text-right">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.items.map((v) => (
+                <tr>
+                  <td>
+                    <input type="hidden" name="sort_id" value={v.id} />
+                    <input
+                      class="tm-cell-input"
+                      type="number"
+                      name="sort_value"
+                      value={v.sort}
+                      disabled={!mayUpdate}
+                      aria-label={`${v.make_title} ${v.model_title} 的排序`}
+                    />
+                  </td>
+
+                  <td>
+                    <img class="tm-thumb h-12 w-[4.5rem]" src={photoUrl(v.id, v.photo)} alt="" loading="lazy" />
+                  </td>
+
+                  <td>
+                    <span class="block font-medium text-ink">{v.make_title} {v.model_title}</span>
+                    <span class="mt-0.5 flex flex-wrap items-center gap-x-2 text-[13px] text-ink-mute">
+                      <span class="font-mono text-[11px] tracking-wider">{stub(v.id)}</span>
+                      {v.location && <span>{v.location}</span>}
+                    </span>
+                  </td>
+
+                  <td class="font-mono text-[13px]">{v.year}</td>
+                  <td class="font-mono text-[13px]">¥{v.price.toLocaleString('en-US')}</td>
+
+                  <td>
+                    <div class="flex flex-wrap items-center justify-end gap-1.5">
+                      {mayUpdate && (
+                        <a class="tm-btn tm-btn--ghost tm-btn--sm" href={`/admin/vehicles/edit?type=${type}&id=${v.id}`}>
+                          編輯
+                        </a>
+                      )}
+                      <a class="tm-btn tm-btn--ghost tm-btn--sm" href={`/admin/vehicles/photos?id=${v.id}`}>相簿</a>
+                      <a class="tm-btn tm-btn--ghost tm-btn--sm" href={`${frontPath}/${v.id}`} target="_blank" rel="noopener">
+                        前台 ↗
+                      </a>
+                      {mayDelete && (
+                        // form 屬性指向表格外面那張刪除表單 —— 表單不能互相嵌套，
+                        // 而 name/value 會把這一列的 id 帶過去。
+                        <button
+                          class="tm-btn tm-btn--danger tm-btn--sm"
+                          type="submit"
+                          form="tm-delete-vehicle"
+                          name="id"
+                          value={v.id}
+                          aria-label={`刪除 ${v.make_title} ${v.model_title}`}
+                        >
+                          刪除
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {mayUpdate && (
+          <div class="flex items-center gap-3 border-t border-rule px-4 py-3">
+            <button class="tm-btn" type="submit">儲存排序</button>
+            <span class="text-[13px] text-ink-mute">數字小的排在前面。</span>
+          </div>
+        )}
+      </form>
+    )}
+
+    <Pager page={data.page} totalPages={data.totalPages} total={data.total} href={(n) => qs({ p: n })} />
+  </Panel>
+
+  {mayDelete && (
+    <form
+      method="post"
+      id="tm-delete-vehicle"
+      onsubmit="return confirm('刪除這台車？它的主圖與相簿全部會一起刪掉，無法復原。')"
+    >
+      <input type="hidden" name="csrf" value={csrf} />
+      <input type="hidden" name="action" value="delete" />
+    </form>
+  )}
 </Admin>

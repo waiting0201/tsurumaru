@@ -1,0 +1,72 @@
+---
+// 分頁。每頁 20 筆是不能變的行為（ADR-0005），但頁碼的呈現可以。
+//
+// 舊版把每一頁都印出來 —— 車型有幾百筆時會排出一整片數字。這裡改成
+// 只留頭尾與目前頁前後兩頁，中間用「…」帶過。
+
+interface Props {
+  page: number;
+  totalPages: number;
+  /** 給第 n 頁的網址 */
+  href: (n: number) => string;
+  /** 總筆數，印在右側 */
+  total?: number;
+}
+
+const { page, totalPages, href, total } = Astro.props;
+
+// 頭尾 + 目前頁 ±2，去重後排序；相鄰數字有斷點就插一個 null 當作「…」
+const window = new Set<number>([1, totalPages]);
+for (let n = page - 2; n <= page + 2; n++) if (n >= 1 && n <= totalPages) window.add(n);
+
+const nums = [...window].sort((a, b) => a - b);
+const slots: (number | null)[] = [];
+nums.forEach((n, i) => {
+  if (i > 0 && n - nums[i - 1] > 1) slots.push(null);
+  slots.push(n);
+});
+---
+
+{
+  totalPages > 1 && (
+    <nav class="flex flex-wrap items-center gap-1.5 border-t border-rule px-4 py-3" aria-label="分頁">
+      <a
+        href={page > 1 ? href(page - 1) : undefined}
+        aria-disabled={page > 1 ? undefined : 'true'}
+        class:list={['tm-page-link', page === 1 && 'pointer-events-none opacity-40']}
+      >
+        <span aria-hidden="true">←</span>
+        <span class="sr-only">上一頁</span>
+      </a>
+
+      {slots.map((n) =>
+        n === null ? (
+          <span class="px-1 font-mono text-[13px] text-ink-mute">…</span>
+        ) : n === page ? (
+          <span class="tm-page-link" aria-current="page">
+            {n}
+          </span>
+        ) : (
+          <a class="tm-page-link" href={href(n)}>
+            {n}
+          </a>
+        ),
+      )}
+
+      <a
+        href={page < totalPages ? href(page + 1) : undefined}
+        aria-disabled={page < totalPages ? undefined : 'true'}
+        class:list={['tm-page-link', page === totalPages && 'pointer-events-none opacity-40']}
+      >
+        <span aria-hidden="true">→</span>
+        <span class="sr-only">下一頁</span>
+      </a>
+
+      {total != null && (
+        <span class="ml-auto font-mono text-[12px] text-ink-mute">
+          {page} / {totalPages}　共 {total.toLocaleString('en-US')} 筆
+        </span>
+      )}
+    </nav>
+  )
+}

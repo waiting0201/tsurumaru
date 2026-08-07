@@ -6,6 +6,9 @@
 //   • 超級管理員改為資料庫旗標 is_super，取代硬編碼的 AdminID=888
 //   • 權限節點涵蓋相簿（舊版遺漏）
 import Admin from '../../../layouts/Admin.astro';
+import Panel from '../../../components/admin/Panel.astro';
+import Flash from '../../../components/admin/Flash.astro';
+import Field from '../../../components/admin/Field.astro';
 import { requireView, requireCan, requirePost, handleGuard, str, int } from '../../../lib/admin-guard';
 import { csrfToken, RESOURCES, can, hashPassword } from '../../../lib/auth';
 import {
@@ -87,108 +90,208 @@ try {
   return handleGuard(e);
 }
 
-const leaves = permissions.filter((p) => p.parent_id !== null);
 const parentName = (id: number | null) => permissions.find((p) => p.id === id)?.value ?? '';
 const permOf = (id: number) => editingPerms.get(id) ?? { add: false, update: false, delete: false };
+
+// 權限節點是兩層的。按上層分組後再列，表格才看得出「哪個資源的哪個動作」，
+// 而不是一整片沒有層次的核取方塊。
+const grouped = new Map<string, typeof permissions>();
+for (const p of permissions) {
+  if (p.parent_id === null) continue;
+  const key = parentName(p.parent_id);
+  if (!grouped.has(key)) grouped.set(key, []);
+  grouped.get(key)!.push(p);
+}
+const groups = [...grouped.entries()];
+
+const ACTION_LABEL = { add: '新增', update: '修改', delete: '刪除' } as const;
 ---
+
 <Admin title="管理員維護" admin={admin} csrf={csrf}>
-  {err && <div class="msg err">{err}</div>}
-  {msg && <div class="msg ok">{msg}</div>}
+  <Flash err={err} msg={msg} />
 
-  <div class="panel">
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>帳號</th><th>姓名</th><th>Email</th><th>角色</th><th style="width:8rem">操作</th></tr></thead>
-        <tbody>
-          {admins.map((a) => (
+  <div class="space-y-5">
+    <Panel title="管理員帳號" flush>
+      <span class="font-mono text-[12px] text-ink-mute" slot="head">{admins.length} 人</span>
+
+      <div class="overflow-x-auto">
+        <table class="tm-table">
+          <thead>
             <tr>
-              <td>{a.username}</td>
-              <td>{a.name}</td>
-              <td>{a.email}</td>
-              <td>{a.is_super === 1 ? '超級管理員' : '一般'}
-                {a.password_hash.startsWith('!') && <span class="muted"><br>尚未設定密碼</span>}
-              </td>
-              <td>{mayUpdate && <a class="btn secondary sm" href={`?edit=${a.id}`}>編輯</a>}</td>
+              <th class="w-44">帳號</th>
+              <th class="w-36">姓名</th>
+              <th>Email</th>
+              <th class="w-32">角色</th>
+              <th class="w-24 text-right">操作</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  </div>
+          </thead>
+          <tbody>
+            {admins.map((a) => (
+              <tr class:list={[editing?.id === a.id && 'bg-paper']}>
+                <td>
+                  <span class="font-mono text-[13px] font-medium text-ink">{a.username}</span>
+                  {a.id === admin.id && <span class="ml-2 text-[12px] text-ink-mute">（你）</span>}
+                  {/* 密碼雜湊以 ! 開頭 = 還沒設過密碼，這個帳號登不進來 */}
+                  {a.password_hash.startsWith('!') && (
+                    <span class="mt-1 flex w-fit items-center gap-1.5 border border-stamp/40 bg-stamp/8 px-1.5 py-0.5 font-mono text-[10px] tracking-[0.1em] text-stamp-ink uppercase">
+                      尚未設定密碼
+                    </span>
+                  )}
+                </td>
+                <td class="text-ink-soft">{a.name || <span class="text-ink-mute">—</span>}</td>
+                <td class="text-ink-soft">{a.email || <span class="text-ink-mute">—</span>}</td>
+                <td>
+                  {a.is_super === 1 ? (
+                    <span class="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink">
+                      <span class="size-1.5 bg-stamp" aria-hidden="true" />超級管理員
+                    </span>
+                  ) : (
+                    <span class="text-[13px] text-ink-mute">一般</span>
+                  )}
+                </td>
+                <td class="text-right">
+                  {mayUpdate && <a class="tm-btn tm-btn--ghost tm-btn--sm" href={`?edit=${a.id}#edit`}>編輯</a>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Panel>
 
-  {(mayUpdate && editing) && (
-    <div class="panel">
-      <h2 style="font-size:1.1rem;margin-top:0">編輯「{editing.username}」</h2>
-      <form method="post">
-        <input type="hidden" name="csrf" value={csrf}>
-        <input type="hidden" name="action" value="update">
-        <input type="hidden" name="id" value={editing.id}>
-        <div class="grid">
-          <div><label for="e-name">姓名</label><input id="e-name" name="name" type="text" value={editing.name ?? ''}></div>
-          <div><label for="e-email">Email</label><input id="e-email" name="email" type="email" value={editing.email ?? ''}></div>
-          <div><label for="e-pw">新密碼（留空表示不變更）</label><input id="e-pw" name="password" type="password" autocomplete="new-password"></div>
-          <div><label for="e-super">角色</label>
-            <select id="e-super" name="is_super">
-              <option value="0" selected={editing.is_super !== 1}>一般管理員</option>
-              <option value="1" selected={editing.is_super === 1}>超級管理員（擁有全部權限）</option>
-            </select></div>
-        </div>
+    {mayUpdate && editing && (
+      <Panel title={`編輯 — ${editing.username}`} class="scroll-mt-24" id="edit">
+        <form method="post">
+          <input type="hidden" name="csrf" value={csrf} />
+          <input type="hidden" name="action" value="update" />
+          <input type="hidden" name="id" value={editing.id} />
 
-        <h3 style="font-size:1rem;margin:1.5rem 0 .5rem">權限</h3>
-        <p class="muted" style="margin-top:0">超級管理員不受此表限制。</p>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>資源</th><th style="width:6rem">新增</th><th style="width:6rem">修改</th><th style="width:6rem">刪除</th></tr></thead>
-            <tbody>
-              {leaves.map((p) => {
-                const cur = permOf(p.id);
-                return (
+          <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <Field label="姓名" for="e-name">
+              <input id="e-name" name="name" type="text" value={editing.name ?? ''} />
+            </Field>
+            <Field label="Email" for="e-email">
+              <input id="e-email" name="email" type="email" value={editing.email ?? ''} />
+            </Field>
+            <Field label="新密碼" for="e-pw" hint="留空表示不變更。">
+              <input id="e-pw" name="password" type="password" autocomplete="new-password" />
+            </Field>
+            <Field label="角色" for="e-super">
+              <select id="e-super" name="is_super">
+                <option value="0" selected={editing.is_super !== 1}>一般管理員</option>
+                <option value="1" selected={editing.is_super === 1}>超級管理員</option>
+              </select>
+            </Field>
+          </div>
+
+          {/* ── 權限 ─────────────────────────────────────────────────── */}
+          <div class="mt-6 border border-rule">
+            <div class="tm-panel-head">
+              <h3 class="tm-panel-title">權限</h3>
+              <p class="text-[13px] text-ink-mute">
+                {editing.is_super === 1
+                  ? '這個帳號是超級管理員，擁有全部權限，下表不生效。'
+                  : '沒有勾選的動作，這個帳號按下去會被拒絕。'}
+              </p>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="tm-table">
+                <thead>
                   <tr>
-                    <td>{parentName(p.parent_id)} — {p.value}</td>
-                    <td><input type="checkbox" name={`perm_${p.id}_add`} value="1" checked={cur.add}></td>
-                    <td><input type="checkbox" name={`perm_${p.id}_update`} value="1" checked={cur.update}></td>
-                    <td><input type="checkbox" name={`perm_${p.id}_delete`} value="1" checked={cur.delete}></td>
+                    <th>資源</th>
+                    <th class="w-24 text-center">新增</th>
+                    <th class="w-24 text-center">修改</th>
+                    <th class="w-24 text-center">刪除</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                {groups.map(([group, leaves]) => (
+                  <tbody>
+                    <tr>
+                      <th colspan="4" class="border-b border-rule bg-paper/60 px-3 py-1.5 text-left">
+                        <span class="tm-eyebrow">{group}</span>
+                      </th>
+                    </tr>
+                    {leaves.map((p) => {
+                      const cur = permOf(p.id);
+                      return (
+                        <tr>
+                          <td class="pl-6 text-ink">{p.value}</td>
+                          {(['add', 'update', 'delete'] as const).map((act) => (
+                            <td class="text-center">
+                              <input
+                                class="size-4 cursor-pointer accent-stamp"
+                                type="checkbox"
+                                name={`perm_${p.id}_${act}`}
+                                value="1"
+                                checked={cur[act]}
+                                aria-label={`${group} ${p.value} — ${ACTION_LABEL[act]}`}
+                              />
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                ))}
+              </table>
+            </div>
+          </div>
 
-        <div class="actions" style="margin-top:1rem">
-          <button class="btn" type="submit">儲存</button>
-          <a class="btn secondary" href="/admin/admins">取消</a>
-        </div>
-      </form>
-
-      {(mayDelete && editing.id !== admin.id) && (
-        <form method="post" style="margin-top:1rem" onsubmit="return confirm('確定刪除這個管理員帳號？')">
-          <input type="hidden" name="csrf" value={csrf}>
-          <input type="hidden" name="action" value="delete">
-          <input type="hidden" name="id" value={editing.id}>
-          <button class="btn danger sm" type="submit">刪除這個帳號</button>
+          <div class="mt-4 flex flex-wrap items-center gap-2">
+            <button class="tm-btn" type="submit">儲存變更</button>
+            <a class="tm-btn tm-btn--ghost" href="/admin/admins">取消</a>
+          </div>
         </form>
-      )}
-    </div>
-  )}
 
-  {mayAdd && (
-    <div class="panel">
-      <h2 style="font-size:1.1rem;margin-top:0">新增管理員</h2>
-      <form method="post">
-        <input type="hidden" name="csrf" value={csrf}>
-        <input type="hidden" name="action" value="create">
-        <div class="grid">
-          <div><label for="c-username">帳號</label><input id="c-username" name="username" type="text" required></div>
-          <div><label for="c-name">姓名</label><input id="c-name" name="name" type="text"></div>
-          <div><label for="c-email">Email</label><input id="c-email" name="email" type="email"></div>
-          <div><label for="c-pw">密碼</label><input id="c-pw" name="password" type="password" autocomplete="new-password" required></div>
-          <div><label for="c-super">角色</label>
-            <select id="c-super" name="is_super"><option value="0">一般管理員</option><option value="1">超級管理員</option></select></div>
-        </div>
-        <p class="muted">建立後可在編輯畫面指派細部權限。</p>
-        <div><button class="btn" type="submit">新增</button></div>
-      </form>
-    </div>
-  )}
+        {mayDelete && editing.id !== admin.id && (
+          <form
+            method="post"
+            class="mt-4 flex flex-wrap items-center gap-3 border-t border-rule pt-4"
+            onsubmit="return confirm('刪除這個管理員帳號？')"
+          >
+            <input type="hidden" name="csrf" value={csrf} />
+            <input type="hidden" name="action" value="delete" />
+            <input type="hidden" name="id" value={editing.id} />
+            <button class="tm-btn tm-btn--danger tm-btn--sm" type="submit">刪除這個帳號</button>
+          </form>
+        )}
+      </Panel>
+    )}
+
+    {mayAdd && (
+      <Panel title="新增管理員">
+        <form method="post">
+          <input type="hidden" name="csrf" value={csrf} />
+          <input type="hidden" name="action" value="create" />
+
+          <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <Field label="帳號" for="c-username" required numeric hint="登入用，建立後不能改。">
+              <input id="c-username" name="username" type="text" autocomplete="off" required />
+            </Field>
+            <Field label="密碼" for="c-pw" required>
+              <input id="c-pw" name="password" type="password" autocomplete="new-password" required />
+            </Field>
+            <Field label="角色" for="c-super">
+              <select id="c-super" name="is_super">
+                <option value="0">一般管理員</option>
+                <option value="1">超級管理員</option>
+              </select>
+            </Field>
+            <Field label="姓名" for="c-name">
+              <input id="c-name" name="name" type="text" />
+            </Field>
+            <Field label="Email" for="c-email">
+              <input id="c-email" name="email" type="email" />
+            </Field>
+          </div>
+
+          <div class="mt-4 flex flex-wrap items-center gap-3">
+            <button class="tm-btn" type="submit">新增管理員</button>
+            <span class="text-[13px] text-ink-mute">一般管理員建立後沒有任何權限，請接著在編輯畫面指派。</span>
+          </div>
+        </form>
+      </Panel>
+    )}
+  </div>
 </Admin>

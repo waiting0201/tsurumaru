@@ -1,6 +1,7 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import cloudflare from '@astrojs/cloudflare';
+import tailwindcss from '@tailwindcss/vite';
 
 // 架構說明見 docs/02-architecture.md
 export default defineConfig({
@@ -27,5 +28,13 @@ export default defineConfig({
   build: {
     // 資產檔名不加 hash，維持與舊站一致的路徑
     assets: '_astro',
+  },
+
+  vite: {
+    // Tailwind 只給後台用（ADR-0005）。src/styles/admin.css 是唯一的進入點，
+    // 而且只有 Admin.astro 與 /admin/login 會 import 它 —— 前台頁面的模組圖
+    // 碰不到這支 css，因此 Tailwind 的 preflight 不會出現在前台，紅線一不受影響。
+    // 驗證方式見 docs/06-verification.md#前台樣式零差異
+    plugins: [tailwindcss()],
   },
 });

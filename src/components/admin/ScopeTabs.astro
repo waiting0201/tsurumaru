@@ -1,0 +1,27 @@
+---
+// 汽車／機車切換。車廠、車型、車輛三個頁面共用同一組 ?type= 語意，
+// 所以切換器也共用一個 —— 三頁的位置與外觀一致，才不用重新找。
+import { VEHICLE_TYPE } from '../../lib/enums';
+
+interface Props {
+  /** 不含 query 的路徑，例如 /admin/vehicles */
+  base: string;
+  current: number;
+}
+
+const { base, current } = Astro.props;
+const tabs = [
+  { type: VEHICLE_TYPE.CAR, label: '汽車' },
+  { type: VEHICLE_TYPE.BIKE, label: '機車' },
+];
+---
+
+<div class="tm-scope" role="group" aria-label="車種">
+  {
+    tabs.map((t) => (
+      <a href={`${base}?type=${t.type}`} aria-current={current === t.type ? 'page' : undefined}>
+        {t.label}
+      </a>
+    ))
+  }
+</div>

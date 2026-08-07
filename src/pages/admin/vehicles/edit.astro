@@ -6,6 +6,9 @@
 //   • 大小上限
 //   • 檔名重新產生，不沿用使用者輸入
 import Admin from '../../../layouts/Admin.astro';
+import Panel from '../../../components/admin/Panel.astro';
+import Flash from '../../../components/admin/Flash.astro';
+import Field from '../../../components/admin/Field.astro';
 import { requireView, requireCan, requirePost, handleGuard, str, int } from '../../../lib/admin-guard';
 import { csrfToken, RESOURCES } from '../../../lib/auth';
 import { getVehicleRow, insertVehicle, updateVehicle, modelsForType } from '../../../lib/admin-db';
@@ -90,96 +93,176 @@ try {
 
 const v = vehicle;
 const val = (k: keyof NonNullable<typeof v>) => (v ? (v[k] ?? '') : '');
+const backHref = `/admin/vehicles?type=${type}`;
+const frontHref = v ? `${type === VEHICLE_TYPE.CAR ? '/cars' : '/bikes'}/${v.id}` : '';
+const maxMb = (MAX_UPLOAD_BYTES / 1024 / 1024).toFixed(0);
+const fieldGrid = 'grid gap-3 sm:grid-cols-2 xl:grid-cols-3';
 ---
+
 <Admin title={`${v ? '編輯' : '新增'}${typeName}`} admin={admin} csrf={csrf}>
-  {err && <div class="msg err">{err}</div>}
-  {msg && <div class="msg ok">{msg}</div>}
+  <Fragment slot="actions">
+    {v && <a class="tm-btn tm-btn--ghost" href={`/admin/vehicles/photos?id=${v.id}`}>相簿</a>}
+    {v && <a class="tm-btn tm-btn--ghost" href={frontHref} target="_blank" rel="noopener">前台 ↗</a>}
+  </Fragment>
+
+  <Flash err={err} msg={msg} />
 
   <form method="post" enctype="multipart/form-data">
-    <input type="hidden" name="csrf" value={csrf}>
+    <input type="hidden" name="csrf" value={csrf} />
 
-    <div class="panel">
-      <div class="grid">
-        <div>
-          <label for="model">車型</label>
-          <select id="model" name="vehicle_model_id" required>
-            <option value="">請選擇</option>
-            {models.map((m) => (
-              <option value={m.id} selected={v?.vehicle_model_id === m.id}>{m.make_title} — {m.title}</option>
-            ))}
-          </select>
-        </div>
-        <div><label for="year">出廠年份</label><input id="year" name="year" type="number" value={val('year')}></div>
-        <div><label for="price">價格（日圓）</label><input id="price" name="price" type="number" value={val('price')} required></div>
-        <div><label for="mileage">里程（公里）</label><input id="mileage" name="mileage" type="number" value={val('mileage')}></div>
-        <div><label for="cc">排氣量 Cc</label><input id="cc" name="cc" type="number" value={val('cc')}></div>
-        <div><label for="sort">排序</label><input id="sort" name="sort" type="number" value={v ? v.sort : 0}></div>
+    <div class="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_17rem]">
+      <!-- ── 左欄：資料 ─────────────────────────────────────────────── -->
+      <div class="space-y-5">
+        <Panel title="基本">
+          <div class={fieldGrid}>
+            <Field label="車型" for="model" required class="sm:col-span-2 xl:col-span-1">
+              <select id="model" name="vehicle_model_id" required>
+                <option value="">請選擇</option>
+                {models.map((m) => (
+                  <option value={m.id} selected={v?.vehicle_model_id === m.id}>{m.make_title} — {m.title}</option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="價格（日圓）" for="price" required numeric>
+              <input id="price" name="price" type="number" min="0" value={val('price')} required />
+            </Field>
+
+            <Field label="出廠年份" for="year" numeric>
+              <input id="year" name="year" type="number" value={val('year')} />
+            </Field>
+
+            <Field label="里程（公里）" for="mileage" numeric>
+              <input id="mileage" name="mileage" type="number" value={val('mileage')} />
+            </Field>
+
+            <Field label="排氣量 CC" for="cc" numeric>
+              <input id="cc" name="cc" type="number" value={val('cc')} />
+            </Field>
+
+            <Field label="排序" for="sort" numeric hint="數字小的排在前面。">
+              <input id="sort" name="sort" type="number" value={v ? v.sort : 0} />
+            </Field>
+          </div>
+        </Panel>
+
+        <Panel title="規格">
+          <div class={fieldGrid}>
+            <Field label="車種" for="vehicle_type">
+              <select id="vehicle_type" name="vehicle_type">
+                <option value="">未指定</option>
+                {Object.entries(VEHICLE_BODY).map(([k, t]) => (
+                  <option value={k} selected={v?.vehicle_type === k}>{t}</option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="燃料" for="fuel">
+              <select id="fuel" name="fuel">
+                <option value="">未指定</option>
+                {Object.entries(FUEL).map(([k, t]) => (
+                  <option value={k} selected={String(v?.fuel ?? '') === k}>{t}</option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="傳動系統" for="driveline">
+              <select id="driveline" name="driveline">
+                <option value="">未指定</option>
+                {Object.entries(DRIVELINE).map(([k, t]) => (
+                  <option value={k} selected={v?.driveline === k}>{t}</option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="變速器" for="transmission">
+              <select id="transmission" name="transmission">
+                <option value="">未指定</option>
+                {Object.entries(TRANSMISSION).map(([k, t]) => (
+                  <option value={k} selected={v?.transmission === k}>{t}</option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="外觀顏色" for="exterior">
+              <select id="exterior" name="exterior">
+                <option value="">未指定</option>
+                {EXTERIOR_COLORS.map((c) => <option value={c} selected={v?.exterior === c}>{c}</option>)}
+              </select>
+            </Field>
+
+            <Field label="內裝" for="interior">
+              <input id="interior" name="interior" type="text" value={val('interior')} />
+            </Field>
+
+            <Field label="發動機" for="engine">
+              <input id="engine" name="engine" type="text" value={val('engine')} />
+            </Field>
+
+            <Field label="所在地" for="location">
+              <input id="location" name="location" type="text" value={val('location')} />
+            </Field>
+
+            <Field label="車身號碼 VIN" for="vin" numeric>
+              <input id="vin" name="vin" type="text" value={val('vin')} spellcheck="false" />
+            </Field>
+          </div>
+        </Panel>
+
+        <Panel title="說明">
+          <div class="space-y-3">
+            <Field label="摘要" for="summary" hint="列表卡片上的一句話。">
+              <textarea id="summary" name="summary">{val('summary')}</textarea>
+            </Field>
+
+            <Field label="詳細說明" for="description" hint="前台詳情頁的內容，可含 HTML 標籤。">
+              <textarea id="description" name="description" class="min-h-48">{val('description')}</textarea>
+            </Field>
+          </div>
+        </Panel>
+      </div>
+
+      <!-- ── 右欄：主圖 ─────────────────────────────────────────────────
+           填規格的時候要能一直看到這台車長什麼樣，所以釘在旁邊不隨著捲動走。 -->
+      <div class="lg:sticky lg:top-24">
+        <Panel title="主圖">
+          {v?.photo ? (
+            <img class="tm-thumb mb-3 aspect-3/2 w-full" src={photoUrl(v.id, v.photo)} alt="目前的主圖" />
+          ) : (
+            <div class="mb-3 grid aspect-3/2 w-full place-items-center border border-dashed border-rule bg-paper">
+              <span class="tm-eyebrow">尚無主圖</span>
+            </div>
+          )}
+
+          <input
+            id="photo"
+            name="photo"
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            class="w-full text-[13px] text-ink-soft file:mr-2 file:cursor-pointer file:border file:border-rule file:bg-white file:px-2.5 file:py-1.5 file:text-[13px] file:text-ink hover:file:border-ink"
+          />
+          <p class="tm-field-hint">
+            {v ? '不選檔案就沿用現有主圖。' : '主圖是必填的。'}
+            接受 JPG／PNG／WebP／GIF，上限 {maxMb} MB。本站不做即時縮圖，請先壓過再上傳（建議寬度 1600px 以內）。
+          </p>
+        </Panel>
+
+        {v && (
+          <dl class="mt-5 border border-rule bg-white px-4 py-3 text-[13px]">
+            <dt class="tm-eyebrow">記錄編號</dt>
+            <dd class="mt-1 font-mono text-[12px] break-all text-ink-soft">{v.id}</dd>
+          </dl>
+        )}
       </div>
     </div>
 
-    <div class="panel">
-      <div class="grid">
-        <div>
-          <label for="vehicle_type">車種</label>
-          <select id="vehicle_type" name="vehicle_type">
-            <option value="">未指定</option>
-            {Object.entries(VEHICLE_BODY).map(([k, t]) => <option value={k} selected={v?.vehicle_type === k}>{t}</option>)}
-          </select>
-        </div>
-        <div>
-          <label for="fuel">燃料</label>
-          <select id="fuel" name="fuel">
-            <option value="">未指定</option>
-            {Object.entries(FUEL).map(([k, t]) => <option value={k} selected={String(v?.fuel ?? '') === k}>{t}</option>)}
-          </select>
-        </div>
-        <div>
-          <label for="driveline">傳動系統</label>
-          <select id="driveline" name="driveline">
-            <option value="">未指定</option>
-            {Object.entries(DRIVELINE).map(([k, t]) => <option value={k} selected={v?.driveline === k}>{t}</option>)}
-          </select>
-        </div>
-        <div>
-          <label for="transmission">變速器</label>
-          <select id="transmission" name="transmission">
-            <option value="">未指定</option>
-            {Object.entries(TRANSMISSION).map(([k, t]) => <option value={k} selected={v?.transmission === k}>{t}</option>)}
-          </select>
-        </div>
-        <div>
-          <label for="exterior">外觀顏色</label>
-          <select id="exterior" name="exterior">
-            <option value="">未指定</option>
-            {EXTERIOR_COLORS.map((c) => <option value={c} selected={v?.exterior === c}>{c}</option>)}
-          </select>
-        </div>
-        <div><label for="interior">內裝</label><input id="interior" name="interior" type="text" value={val('interior')}></div>
-        <div><label for="engine">發動機</label><input id="engine" name="engine" type="text" value={val('engine')}></div>
-        <div><label for="location">所在地</label><input id="location" name="location" type="text" value={val('location')}></div>
-        <div><label for="vin">車身號碼 VIN</label><input id="vin" name="vin" type="text" value={val('vin')}></div>
-      </div>
-    </div>
-
-    <div class="panel">
-      <label for="photo">主圖{v ? '（不選擇檔案則沿用現有主圖）' : ''}</label>
-      {v?.photo && <img class="thumb" style="width:160px;height:110px;margin-bottom:.5rem" src={photoUrl(v.id, v.photo)} alt="">}
-      <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif">
-      <p class="muted" style="margin:.5rem 0 0">
-        接受 JPG／PNG／WebP／GIF，上限 {(MAX_UPLOAD_BYTES / 1024 / 1024).toFixed(0)} MB。
-        本站不做即時縮圖，請盡量上傳已壓縮過的圖片（建議寬度 1600px 以內）。
-      </p>
-    </div>
-
-    <div class="panel">
-      <div><label for="summary">摘要</label><textarea id="summary" name="summary">{val('summary')}</textarea></div>
-      <div style="margin-top:1rem"><label for="description">詳細說明（可含 HTML）</label><textarea id="description" name="description" style="min-height:12rem">{val('description')}</textarea></div>
-    </div>
-
-    <div class="actions">
-      <button class="btn" type="submit">{v ? '儲存' : '新增'}</button>
-      <a class="btn secondary" href={`/admin/vehicles?type=${type}`}>取消</a>
-      {v && <a class="btn secondary" href={`/admin/vehicles/photos?id=${v.id}`}>管理相簿</a>}
+    <!-- 表單很長，存檔鈕跟著畫面走，不用捲回去找 -->
+    <div class="tm-actionbar mt-5">
+      <button class="tm-btn" type="submit">{v ? '儲存變更' : `新增${typeName}`}</button>
+      <a class="tm-btn tm-btn--ghost" href={backHref}>取消</a>
+      <span class="ml-auto flex items-center gap-1.5 text-[13px] text-ink-mute">
+        <span class="size-1.5 bg-stamp" aria-hidden="true"></span>必填
+      </span>
     </div>
   </form>
 </Admin>

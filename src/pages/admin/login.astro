@@ -8,6 +8,7 @@
 //   • 錯誤訊息不區分「帳號不存在」與「密碼錯誤」
 import { login, createSession, sessionCookie, getSessionAdmin, needsPasswordReset } from '../../lib/auth';
 import { env } from 'cloudflare:workers';
+import '../../styles/admin.css';
 
 export const prerender = false;
 
@@ -50,33 +51,62 @@ if (Astro.request.method === 'POST') {
 }
 ---
 
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-Hant-TW">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="robots" content="noindex, nofollow">
-  <title>登入｜Tsurumaru 後台</title>
-  <style>
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f6f7f9;
-      color: #1c1e21; font: 15px/1.6 system-ui, -apple-system, "Noto Sans TC", sans-serif; }
-    form { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 2rem; width: min(360px, 92vw); }
-    h1 { font-size: 1.25rem; margin: 0 0 1.5rem; }
-    label { display: block; font-size: .875rem; color: #6b7280; margin: 0 0 .25rem; }
-    input { width: 100%; padding: .55rem .65rem; border: 1px solid #e5e7eb; border-radius: 6px; font: inherit; margin-bottom: 1rem; }
-    button { width: 100%; padding: .55rem; border: 0; border-radius: 6px; background: #1f6feb; color: #fff; font: inherit; cursor: pointer; }
-    .err { background: #fdf2f0; color: #b42318; border: 1px solid #f4c7c0; padding: .6rem .9rem; border-radius: 6px; margin-bottom: 1rem; font-size: .9rem; }
-  </style>
-</head>
-<body>
-  <form method="post">
-    <h1>TSURUMARU 後台</h1>
-    {error && <div class="err">{error}</div>}
-    <label for="username">帳號</label>
-    <input id="username" name="username" type="text" autocomplete="username" required autofocus>
-    <label for="password">密碼</label>
-    <input id="password" name="password" type="password" autocomplete="current-password" required>
-    <button type="submit">登入</button>
-  </form>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="color-scheme" content="light" />
+    <title>登入｜Tsurumaru 後台</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&display=swap"
+    />
+  </head>
+
+  <body class="grid min-h-screen place-items-center p-4">
+    <main class="w-full max-w-sm">
+      <div class="tm-panel">
+        <!-- 抬頭沿用側欄的深色與朱印，登入畫面與後台是同一個地方 -->
+        <header class="flex items-center gap-3 bg-rail px-5 py-4">
+          <span class="size-2.5 shrink-0 bg-stamp" aria-hidden="true"></span>
+          <span>
+            <span class="block font-mono text-[15px] leading-none font-medium tracking-[0.18em] text-white"
+              >TSURUMARU</span
+            >
+            <span class="mt-1.5 block text-[11px] leading-none tracking-[0.2em] text-rail-text">在庫管理</span>
+          </span>
+        </header>
+
+        <form method="post" class="p-5">
+          {
+            error && (
+              <p class="tm-flash tm-flash--err mb-4 break-words" role="alert">
+                {error}
+              </p>
+            )
+          }
+
+          <div class="space-y-3">
+            <div class="tm-field" data-required>
+              <label class="tm-field-label" for="username">帳號</label>
+              <input id="username" name="username" type="text" autocomplete="username" required autofocus />
+            </div>
+
+            <div class="tm-field" data-required>
+              <label class="tm-field-label" for="password">密碼</label>
+              <input id="password" name="password" type="password" autocomplete="current-password" required />
+            </div>
+          </div>
+
+          <button type="submit" class="tm-btn mt-4 w-full py-2.5">登入</button>
+        </form>
+      </div>
+
+      <p class="tm-eyebrow mt-4 text-center">僅供內部使用</p>
+    </main>
+  </body>
 </html>

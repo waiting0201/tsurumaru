@@ -1,0 +1,33 @@
+---
+// 記入欄 —— 後台的簽名式元件（樣式見 src/styles/admin.css）。
+// 標籤印在框線內的左上角，控制項填在下面。控制項本身用 <slot>，
+// 所以 input / select / textarea 都是同一個外框，唯讀與可編輯也長得一樣。
+//
+//   <Field label="價格" for="price" required numeric>
+//     <input id="price" name="price" type="number" required>
+//   </Field>
+
+interface Props {
+  /** 印在框內左上角的欄位名 */
+  label: string;
+  /** 對應控制項的 id；沒有就不輸出 <label for> */
+  for?: string;
+  /** 右上角點一個朱紅記號。純視覺，required 仍要下在控制項上。 */
+  required?: boolean;
+  /** 值是數字或代碼 —— 改用等寬字，才能上下對齊 */
+  numeric?: boolean;
+  /** 框線下方的說明文字 */
+  hint?: string;
+  class?: string;
+}
+
+const { label, for: htmlFor, required, numeric, hint, class: cls = '' } = Astro.props;
+---
+
+<div class={cls}>
+  <div class:list={['tm-field', numeric && 'tm-field--num']} data-required={required ? '' : undefined}>
+    <label class="tm-field-label" for={htmlFor}>{label}</label>
+    <slot />
+  </div>
+  {hint && <p class="tm-field-hint">{hint}</p>}
+</div>

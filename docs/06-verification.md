@@ -54,6 +54,31 @@ curl -s http://localhost:4321/ | grep -E '<(link|script)'
 
 **順序也要一致** — vendor JS 的載入順序會影響初始化行為。
 
+### B2. Tailwind 沒有洩漏到前台（後台動到樣式時必做）
+
+後台用 Tailwind（[ADR-0005](adr/0005-rebuild-admin-ui.md)），它的 preflight 會重置 `*`、`img`、`table`、表單元素 —— 一旦被前台頁面載到，`theme.css` 立刻走樣。隔離靠的是「只有 `layouts/Admin.astro` 與 `pages/admin/login.astro` import `src/styles/admin.css`」這一件事，很容易在新增後台頁面時破功。
+
+```bash
+# 1. 只有 layouts/Admin.astro 與 pages/admin/login.astro 可以出現在結果裡
+grep -rn "import .*styles/admin.css" src/
+
+# 2. 前台實際渲染結果不得出現任何 Tailwind 參照（每個都要是 0）
+for p in / /cars /bikes /about /map /privacy; do
+  echo "$p → $(curl -s "http://localhost:4321$p" | grep -c 'styles/admin\|tailwind')"
+done
+
+# 3. 建置後：前台預渲染頁面不得連到 admin 的 CSS bundle
+npm run build
+grep -c "_astro/admin" dist/client/{about,map,privacy}/index.html
+```
+
+順帶檢查 `src/styles/admin.css` 的 `@source` 清單還是只指向後台。少了 `source(none)` 或多列了路徑，Tailwind 會把 `reference/old/` 的舊 class 名當成 utility 產出來 — 徵兆是 bundle 明顯變大：
+
+```bash
+ls -la dist/client/_astro/admin.*.css          # 約 32 KB；破百 KB 就是掃到不該掃的地方
+grep -c "car-finder\|jarallax" dist/client/_astro/admin.*.css   # 必須是 0
+```
+
 ### C. 視覺比對（有舊站可比時必做）
 
 若舊站仍在線上，在相同視窗寬度（至少 375 / 768 / 1440）逐頁截圖比對：首頁、汽車列表（含篩選展開）、汽車詳情（含相簿燈箱）、機車三頁、關於／地圖／隱私權。

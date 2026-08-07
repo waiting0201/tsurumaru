@@ -1,47 +1,105 @@
 ---
 // 後台總覽。對應舊版 MainController.Index。
+//
+// 舊版是六個一模一樣的方塊。這裡按「多久會動一次」分層：
+// 在庫（每天都在改）→ 主檔（偶爾維護）→ 帳號。
+// 分層本身就是資訊 —— 它告訴人每天該從哪裡開始。
 import Admin from '../../layouts/Admin.astro';
+import Panel from '../../components/admin/Panel.astro';
 import { requireAdmin, handleGuard } from '../../lib/admin-guard';
-import { csrfToken } from '../../lib/auth';
+import { csrfToken, RESOURCES, can } from '../../lib/auth';
 import { dashboardStats } from '../../lib/admin-db';
+import { VEHICLE_TYPE } from '../../lib/enums';
 
 export const prerender = false;
 
-let admin, csrf, stats;
+let admin, csrf, stats, mayAddVehicle = false;
 try {
   admin = await requireAdmin(Astro);
   csrf = await csrfToken(admin.sessionId);
-  stats = await dashboardStats();
+  [stats, mayAddVehicle] = await Promise.all([
+    dashboardStats(),
+    can(admin, RESOURCES.VEHICLES, 'add'),
+  ]);
 } catch (e) {
   return handleGuard(e);
 }
 
-const cards = [
-  { label: '汽車', n: stats?.cars ?? 0, href: '/admin/vehicles?type=1' },
-  { label: '機車', n: stats?.bikes ?? 0, href: '/admin/vehicles?type=2' },
+const n = (v: number | undefined) => (v ?? 0).toLocaleString('en-US');
+
+const stock = [
+  { label: '汽車', code: 'CARS', n: stats?.cars ?? 0, type: VEHICLE_TYPE.CAR },
+  { label: '機車', code: 'BIKES', n: stats?.bikes ?? 0, type: VEHICLE_TYPE.BIKE },
+];
+
+const master = [
   { label: '車廠', n: stats?.makes ?? 0, href: '/admin/makes' },
   { label: '車型', n: stats?.models ?? 0, href: '/admin/models' },
   { label: '相片', n: stats?.photos ?? 0, href: '/admin/vehicles' },
   { label: '管理員', n: stats?.admins ?? 0, href: '/admin/admins' },
 ];
 ---
+
 <Admin title="總覽" admin={admin} csrf={csrf}>
-  <div class="panel">
-    <div class="grid">
-      {cards.map((c) => (
-        <a href={c.href} style="text-decoration:none;color:inherit">
-          <div style="border:1px solid var(--line);border-radius:8px;padding:1rem">
-            <div class="muted">{c.label}</div>
-            <div style="font-size:1.75rem;font-weight:700">{c.n.toLocaleString('en-US')}</div>
+  <div class="space-y-5">
+    <!-- ── 在庫 ─────────────────────────────────────────────────────────
+         每天真正在動的兩個數字，給它們最大的字級與整個面板的寬度。 -->
+    <Panel title="在庫" flush>
+      <!-- gap-px + 底色 = 細格線，不用逐格算 border 該加在哪一邊 -->
+      <div class="grid gap-px bg-rule sm:grid-cols-2">
+        {
+          stock.map((s) => (
+            <a
+              href={`/admin/vehicles?type=${s.type}`}
+              class="group relative flex items-baseline gap-4 bg-white px-5 py-6 transition-colors hover:bg-paper"
+            >
+              <span class="absolute inset-y-4 left-0 w-0.5 bg-transparent transition-colors group-hover:bg-stamp" />
+              <span class="font-mono text-[40px] leading-none font-medium tracking-tight text-ink tabular-nums">
+                {n(s.n)}
+              </span>
+              <span>
+                <span class="block text-[15px] font-medium text-ink">{s.label}</span>
+                <span class="tm-eyebrow mt-0.5 block">{s.code}</span>
+              </span>
+              <span class="ml-auto self-center text-[13px] text-ink-mute transition-colors group-hover:text-ink">
+                檢視 →
+              </span>
+            </a>
+          ))
+        }
+      </div>
+    </Panel>
+
+    <!-- ── 主檔 ───────────────────────────────────────────────────────── -->
+    <Panel title="主檔與帳號" flush>
+      <dl class="grid grid-cols-2 gap-px bg-rule sm:grid-cols-4">
+        {
+          master.map((m) => (
+            <a href={m.href} class="flex flex-col gap-1 bg-white px-4 py-4 transition-colors hover:bg-paper">
+              <dt class="tm-eyebrow">{m.label}</dt>
+              <dd class="font-mono text-[22px] leading-none font-medium text-ink tabular-nums">{n(m.n)}</dd>
+            </a>
+          ))
+        }
+      </dl>
+    </Panel>
+
+    <!-- ── 常用動作 ────────────────────────────────────────────────────
+         按鈕名稱就是它會做的事，跟目的地頁面的標題一致。 -->
+    {
+      mayAddVehicle && (
+        <Panel title="新增一台車">
+          <div class="flex flex-wrap gap-2">
+            <a class="tm-btn" href={`/admin/vehicles/edit?type=${VEHICLE_TYPE.CAR}`}>
+              新增汽車
+            </a>
+            <a class="tm-btn" href={`/admin/vehicles/edit?type=${VEHICLE_TYPE.BIKE}`}>
+              新增機車
+            </a>
           </div>
-        </a>
-      ))}
-    </div>
-  </div>
-  <div class="panel">
-    <p class="muted" style="margin:0">
-      前台網站：<a href="/" target="_blank">開啟</a>　·
-      車輛的新增與相片管理請從「車輛」進入。
-    </p>
+          <p class="tm-field-hint">相片在車輛存檔後，從該車的「相簿」上傳。</p>
+        </Panel>
+      )
+    }
   </div>
 </Admin>

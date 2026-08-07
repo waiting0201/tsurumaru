@@ -38,6 +38,7 @@
 3. **`reference/old/` 唯讀。** 它是行為的真相來源，不修改、不建置、不納入 tsconfig／建置流程。
 4. **祕密只進 `wrangler secret` 或 `.dev.vars`。** `.dev.vars` 必須在 `.gitignore` 內。任何 key 都不得寫進 `wrangler.jsonc`。
 5. **不新增前台 UI 相依套件。** 需要互動就用既有的 vendor 套件（tiny-slider / nouislider / lightgallery / simplebar / jarallax）。
+6. **Tailwind 只給後台。** `src/styles/admin.css` 只能被 `src/layouts/Admin.astro` 與 `src/pages/admin/login.astro` import。它的 preflight 會重置 `*`／`img`／`table`／表單元素 —— 前台載到就直接違反紅線一。檢查指令見 [docs/06-verification.md](docs/06-verification.md#b2-tailwind-沒有洩漏到前台)，設計語彙見 [ADR-0005](docs/adr/0005-rebuild-admin-ui.md)。
 6. **本專案跑在 Workers 免費方案。** 每次呼叫 CPU 上限 **10ms**，超過會中斷請求。新增 SSR 頁面或迴圈運算前先讀 [docs/10-cost.md](docs/10-cost.md#最大的風險cpu-上限)。
 
 ---
@@ -52,11 +53,12 @@ tsurumaru/
 ├── reference/old/            ← 舊 ASP.NET MVC 原始碼（唯讀真相來源）
 ├── src/
 │   ├── pages/                ← 前台路由（照搬 Razor markup）
-│   ├── pages/admin/          ← 後台（重新設計 UI）
-│   ├── layouts/              ← _Layout.cshtml 對應
-│   ├── components/           ← _Header / _Footer 等 partial 對應
+│   ├── pages/admin/          ← 後台（重新設計 UI，Tailwind）
+│   ├── layouts/              ← Site.astro（前台）／Admin.astro（後台外框）
+│   ├── components/site/      ← _Header / _Footer 等 partial 對應
+│   ├── components/admin/     ← Panel / Field / Flash / Pager / ScopeTabs
 │   ├── lib/                  ← D1 查詢、R2 存取、auth、列舉字典
-│   └── styles/
+│   └── styles/admin.css      ← Tailwind 進入點＋後台設計語彙（僅後台，紅線六）
 ├── public/                   ← theme.css 與 vendor 資產（原樣）
 ├── migrations/               ← D1 SQL migrations
 ├── scripts/                  ← 一次性搬遷腳本
@@ -85,6 +87,7 @@ npm run deploy                                     # 建置並部署到 Workers
 |---|---|
 | astro | 7.2.0 |
 | @astrojs/cloudflare | 14.2.0 |
+| tailwindcss ＋ @tailwindcss/vite | 4.3.3（**只給後台**，見紅線六） |
 | wrangler | 4.119.0 |
 | Node | 24.x |
 | typescript | 5.9.x（**不可升 7** — `@astrojs/check` 的 peer 是 ^5 \|\| ^6） |

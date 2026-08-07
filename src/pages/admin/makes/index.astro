@@ -2,6 +2,11 @@
 // 車廠維護。對應舊版 WebMsController 的 CarMakes / MotorMakes 兩套重複程式，
 // 這裡合併為單一頁面，以 ?type= 區分（docs/04-conventions.md）。
 import Admin from '../../../layouts/Admin.astro';
+import Panel from '../../../components/admin/Panel.astro';
+import Flash from '../../../components/admin/Flash.astro';
+import Field from '../../../components/admin/Field.astro';
+import Pager from '../../../components/admin/Pager.astro';
+import ScopeTabs from '../../../components/admin/ScopeTabs.astro';
 import { requireView, requireCan, requirePost, handleGuard, str, int } from '../../../lib/admin-guard';
 import { csrfToken, RESOURCES, can } from '../../../lib/auth';
 import { listMakes, createMake, updateMake, deleteMake, makeInUse, getMake, updateSorts } from '../../../lib/admin-db';
@@ -69,94 +74,139 @@ const editing = editId ? data.items.find((m) => m.id === editId) : null;
 const qs = (o: Record<string, string | number>) =>
   '?' + new URLSearchParams({ type: String(type), ...Object.fromEntries(Object.entries(o).map(([k, v]) => [k, String(v)])) }).toString();
 ---
+
 <Admin title={`車廠維護 — ${typeName}`} admin={admin} csrf={csrf}>
-  {err && <div class="msg err">{err}</div>}
-  {msg && <div class="msg ok">{msg}</div>}
+  <ScopeTabs slot="actions" base="/admin/makes" current={type} />
 
-  <div class="panel">
-    <div class="actions" style="margin-bottom:1rem">
-      <a class="btn secondary sm" href="/admin/makes?type=1" aria-current={type === 1 ? 'true' : undefined}>汽車</a>
-      <a class="btn secondary sm" href="/admin/makes?type=2" aria-current={type === 2 ? 'true' : undefined}>機車</a>
-      <span class="muted">共 {data.total} 筆</span>
-    </div>
+  <Flash err={err} msg={msg} />
 
-    <form method="post">
-      <input type="hidden" name="csrf" value={csrf}>
-      <input type="hidden" name="action" value="sort">
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th style="width:6rem">排序</th><th>代碼</th><th>名稱</th><th style="width:12rem">操作</th></tr></thead>
-          <tbody>
-            {data.items.map((m) => (
-              <tr>
-                <td>
-                  <input type="hidden" name="sort_id" value={m.id}>
-                  <input type="number" name="sort_value" value={m.sort} disabled={!mayUpdate} style="width:5rem">
-                </td>
-                <td>{m.code}</td>
-                <td>{m.title}</td>
-                <td class="actions">
-                  {mayUpdate && <a class="btn secondary sm" href={qs({ p: page, edit: m.id })}>編輯</a>}
-                </td>
-              </tr>
-            ))}
-            {data.items.length === 0 && <tr><td colspan="4" class="muted">沒有資料。</td></tr>}
-          </tbody>
-        </table>
-      </div>
-      {mayUpdate && data.items.length > 0 && (
-        <div style="margin-top:1rem"><button class="btn" type="submit">儲存排序</button></div>
-      )}
-    </form>
+  <div class="space-y-5">
+    <Panel title={`${typeName}車廠`} flush>
+      <span class="font-mono text-[12px] text-ink-mute" slot="head">{data.total.toLocaleString('en-US')} 筆</span>
 
-    <div class="pager">
-      {Array.from({ length: data.totalPages }, (_, i) => i + 1).map((n) => (
-        n === data.page ? <span aria-current="page">{n}</span> : <a href={qs({ p: n })}>{n}</a>
-      ))}
-    </div>
-  </div>
-
-  {(mayUpdate && editing) && (
-    <div class="panel">
-      <h2 style="font-size:1.1rem;margin-top:0">編輯車廠</h2>
-      <form method="post">
-        <input type="hidden" name="csrf" value={csrf}>
-        <input type="hidden" name="action" value="update">
-        <input type="hidden" name="id" value={editing.id}>
-        <div class="grid">
-          <div><label for="e-code">代碼</label><input id="e-code" name="code" type="text" value={editing.code} required></div>
-          <div><label for="e-title">名稱</label><input id="e-title" name="title" type="text" value={editing.title} required></div>
-          <div><label for="e-sort">排序</label><input id="e-sort" name="sort" type="number" value={editing.sort}></div>
+      {data.items.length === 0 ? (
+        <div class="px-5 py-12 text-center">
+          <p class="text-[15px] text-ink">還沒有{typeName}車廠。</p>
+          <p class="tm-field-hint mx-auto max-w-xs">車廠是車型的上層 —— 先建車廠，才能建車型與車輛。</p>
         </div>
-        <div class="actions" style="margin-top:1rem">
-          <button class="btn" type="submit">儲存</button>
-          <a class="btn secondary" href={qs({ p: page })}>取消</a>
-        </div>
-      </form>
-      {mayDelete && (
-        <form method="post" style="margin-top:1rem" onsubmit="return confirm('確定刪除這個車廠？')">
-          <input type="hidden" name="csrf" value={csrf}>
-          <input type="hidden" name="action" value="delete">
-          <input type="hidden" name="id" value={editing.id}>
-          <button class="btn danger sm" type="submit">刪除這個車廠</button>
+      ) : (
+        <form method="post">
+          <input type="hidden" name="csrf" value={csrf} />
+          <input type="hidden" name="action" value="sort" />
+
+          <div class="overflow-x-auto">
+            <table class="tm-table">
+              <thead>
+                <tr>
+                  <th class="w-20">排序</th>
+                  <th class="w-40">代碼</th>
+                  <th>名稱</th>
+                  <th class="w-24 text-right">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.items.map((m) => (
+                  <tr class:list={[editing?.id === m.id && 'bg-paper']}>
+                    <td>
+                      <input type="hidden" name="sort_id" value={m.id} />
+                      <input
+                        class="tm-cell-input"
+                        type="number"
+                        name="sort_value"
+                        value={m.sort}
+                        disabled={!mayUpdate}
+                        aria-label={`${m.title} 的排序`}
+                      />
+                    </td>
+                    <td class="font-mono text-[13px] text-ink-soft">{m.code}</td>
+                    <td class="font-medium text-ink">{m.title}</td>
+                    <td class="text-right">
+                      {mayUpdate && (
+                        <a class="tm-btn tm-btn--ghost tm-btn--sm" href={`${qs({ p: page, edit: m.id })}#edit`}>編輯</a>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {mayUpdate && (
+            <div class="flex items-center gap-3 border-t border-rule px-4 py-3">
+              <button class="tm-btn" type="submit">儲存排序</button>
+              <span class="text-[13px] text-ink-mute">數字小的排在前面。</span>
+            </div>
+          )}
         </form>
       )}
-    </div>
-  )}
 
-  {mayAdd && (
-    <div class="panel">
-      <h2 style="font-size:1.1rem;margin-top:0">新增{typeName}車廠</h2>
-      <form method="post">
-        <input type="hidden" name="csrf" value={csrf}>
-        <input type="hidden" name="action" value="create">
-        <div class="grid">
-          <div><label for="c-code">代碼</label><input id="c-code" name="code" type="text" required></div>
-          <div><label for="c-title">名稱</label><input id="c-title" name="title" type="text" required></div>
-          <div><label for="c-sort">排序</label><input id="c-sort" name="sort" type="number" value="0"></div>
-        </div>
-        <div style="margin-top:1rem"><button class="btn" type="submit">新增</button></div>
-      </form>
-    </div>
-  )}
+      <Pager page={data.page} totalPages={data.totalPages} total={data.total} href={(n) => qs({ p: n })} />
+    </Panel>
+
+    {mayUpdate && editing && (
+      <Panel title={`編輯車廠 — ${editing.title}`} class="scroll-mt-24" id="edit">
+        <form method="post">
+          <input type="hidden" name="csrf" value={csrf} />
+          <input type="hidden" name="action" value="update" />
+          <input type="hidden" name="id" value={editing.id} />
+
+          <div class="grid gap-3 sm:grid-cols-3">
+            <Field label="代碼" for="e-code" required numeric hint="前台網址與篩選用，建議英數。">
+              <input id="e-code" name="code" type="text" value={editing.code} required />
+            </Field>
+            <Field label="名稱" for="e-title" required>
+              <input id="e-title" name="title" type="text" value={editing.title} required />
+            </Field>
+            <Field label="排序" for="e-sort" numeric>
+              <input id="e-sort" name="sort" type="number" value={editing.sort} />
+            </Field>
+          </div>
+
+          <div class="mt-4 flex flex-wrap items-center gap-2">
+            <button class="tm-btn" type="submit">儲存變更</button>
+            <a class="tm-btn tm-btn--ghost" href={qs({ p: page })}>取消</a>
+          </div>
+        </form>
+
+        {mayDelete && (
+          <form
+            method="post"
+            class="mt-4 flex flex-wrap items-center gap-3 border-t border-rule pt-4"
+            onsubmit="return confirm('刪除這個車廠？')"
+          >
+            <input type="hidden" name="csrf" value={csrf} />
+            <input type="hidden" name="action" value="delete" />
+            <input type="hidden" name="id" value={editing.id} />
+            <button class="tm-btn tm-btn--danger tm-btn--sm" type="submit">刪除這個車廠</button>
+            <span class="text-[13px] text-ink-mute">底下還有車型的車廠不能刪。</span>
+          </form>
+        )}
+      </Panel>
+    )}
+
+    {mayAdd && (
+      <Panel title={`新增${typeName}車廠`}>
+        <form method="post">
+          <input type="hidden" name="csrf" value={csrf} />
+          <input type="hidden" name="action" value="create" />
+
+          <div class="grid gap-3 sm:grid-cols-3">
+            <Field label="代碼" for="c-code" required numeric hint="前台網址與篩選用，建議英數。">
+              <input id="c-code" name="code" type="text" required />
+            </Field>
+            <Field label="名稱" for="c-title" required>
+              <input id="c-title" name="title" type="text" required />
+            </Field>
+            <Field label="排序" for="c-sort" numeric>
+              <input id="c-sort" name="sort" type="number" value="0" />
+            </Field>
+          </div>
+
+          <div class="mt-4">
+            <button class="tm-btn" type="submit">新增車廠</button>
+          </div>
+        </form>
+      </Panel>
+    )}
+  </div>
 </Admin>

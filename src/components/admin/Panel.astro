@@ -1,0 +1,33 @@
+---
+// 面板。抬頭是一條淡色帶狀，像表單上印好的分區標題。
+//
+// slot="head" 放右側的動作或計數；不給 title 就整個抬頭不出現。
+// flush 用在內容本身就是表格的時候 —— 表格自己有邊框，不需要再加內距。
+
+interface Props {
+  title?: string;
+  /** 內容區不加內距（表格用） */
+  flush?: boolean;
+  /** 錨點用 —— 從列表的「編輯」跳到頁面下方的編輯面板 */
+  id?: string;
+  class?: string;
+}
+
+const { title, flush, id, class: cls = '' } = Astro.props;
+---
+
+<section id={id} class:list={['tm-panel', cls]}>
+  {
+    title && (
+      <header class="tm-panel-head">
+        <h2 class="tm-panel-title">{title}</h2>
+        <div class="ml-auto flex flex-wrap items-center gap-2">
+          <slot name="head" />
+        </div>
+      </header>
+    )
+  }
+  <div class={flush ? '' : 'tm-panel-body'}>
+    <slot />
+  </div>
+</section>
