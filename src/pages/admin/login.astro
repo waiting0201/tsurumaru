@@ -6,7 +6,8 @@
 //   • 密碼比對走 PBKDF2 + 固定時間比較
 //   • 登入成功後換發新 session id（避免 session fixation）
 //   • 錯誤訊息不區分「帳號不存在」與「密碼錯誤」
-import { login, createSession, sessionCookie, getSessionAdmin } from '../../lib/auth';
+import { login, createSession, sessionCookie, getSessionAdmin, needsPasswordReset } from '../../lib/auth';
+import { env } from 'cloudflare:workers';
 
 export const prerender = false;
 
@@ -30,7 +31,13 @@ if (Astro.request.method === 'POST') {
   } else {
     const admin = await login(username, password);
     if (!admin) {
-      error = '帳號或密碼不正確。';
+      // 區分「密碼錯」與「這個帳號的雜湊參數已無法驗證」——後者無論輸入什麼
+      // 密碼都會失敗，講「密碼不正確」會把人引導到完全錯誤的方向。
+      const row = await env.DB.prepare('SELECT password_hash FROM admins WHERE username = ?')
+        .bind(username).first<{ password_hash: string }>();
+      error = row && needsPasswordReset(row.password_hash)
+        ? '這個帳號的密碼是用舊的雜湊參數建立的，無法驗證，必須重設。請執行：node scripts/set-admin-password.mjs ' + username + ' --remote'
+        : '帳號或密碼不正確。';
     } else {
       const session = await createSession(admin.id);
       const target = nextUrl.startsWith('/admin') ? nextUrl : '/admin';

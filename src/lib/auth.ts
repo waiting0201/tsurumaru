@@ -50,11 +50,31 @@ function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
   return diff === 0;
 }
 
+/**
+ * 驗證時能負擔的最高迭代次數。
+ *
+ * 迭代次數是從「儲存的雜湊」讀出來的，不是用上面的常數 —— 這是為了讓舊雜湊
+ * 仍能驗證。但如果舊雜湊的迭代次數高到跑不完 CPU 預算，驗證會直接讓整個
+ * 請求被中斷，使用者看到的是沒有任何訊息的 500，完全無從診斷（實際發生過）。
+ *
+ * 超過這個上限就直接視為驗證失敗，並由 needsPasswordReset() 讓呼叫端能給出
+ * 可理解的訊息。留 2 倍餘裕以容納 Workers 與本機的 CPU 差異。
+ */
+const MAX_VERIFY_ITERATIONS = ITERATIONS * 2;
+
+/** 這個雜湊是否已經無法在 CPU 預算內驗證，必須重設密碼 */
+export function needsPasswordReset(stored: string): boolean {
+  const iterations = Number(stored.split('$')[2]);
+  return Number.isInteger(iterations) && iterations > MAX_VERIFY_ITERATIONS;
+}
+
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
   const parts = stored.split('$');
   if (parts.length !== 5 || parts[0] !== 'pbkdf2' || parts[1] !== 'sha256') return false;
   const iterations = Number(parts[2]);
   if (!Number.isInteger(iterations) || iterations < 1000) return false;
+  // 跑下去會撞破 CPU 上限而讓請求被中斷，寧可乾淨地失敗
+  if (iterations > MAX_VERIFY_ITERATIONS) return false;
   const salt = unb64(parts[3]);
   const expected = unb64(parts[4]);
   const actual = new Uint8Array(await pbkdf2(password, salt, iterations));
