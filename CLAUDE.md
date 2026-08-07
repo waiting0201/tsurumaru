@@ -2,8 +2,9 @@
 
 中古車／重機買賣網站。舊版是 ASP.NET MVC 5 + Azure SQL，正在改寫為 **Astro SSR on Cloudflare Workers + D1 + R2**。
 
-> **目前狀態：改寫已完成，尚未部署。** 前台 8 個頁面、後台全部功能、資料與圖片搬遷（本地）都已完成並驗證。
-> 逐項狀態見 [docs/README.md](docs/README.md#現況)。剩下的是：設定 GitHub secrets、確認正式資料來源、首次部署。
+> **目前狀態：已上線** — https://www.tsurumarucorp.com 前台 8 個頁面、後台全部功能、資料與圖片搬遷（本地）都已完成並驗證。
+> 前台 8 頁、後台全功能、資料與圖片搬遷、CI/CD 皆已完成並驗證。逐項狀態見 [docs/README.md](docs/README.md#現況)。
+> 尚未處理：正式後台密碼（見 [docs/07-migration.md](docs/07-migration.md#管理員密碼)）、R2 圖片自訂網域（見 [docs/10-cost.md](docs/10-cost.md)）。
 
 > **舊資料來源**：資料庫在本機 Docker 容器 `sqlserver`（資料庫 `tsurumaru`），圖片在 `reference/old/Tsurumaru/Upload/`。連線方式見 [docs/07-migration.md](docs/07-migration.md#來源資料庫本機-docker)，實際內容見 [docs/03-data-model.md](docs/03-data-model.md#實際資料快照)。**一律唯讀存取**，且該容器同時放著其他專案的資料庫。
 
