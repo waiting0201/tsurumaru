@@ -13,7 +13,18 @@ import type { AdminRow } from './types';
 
 // ── 密碼雜湊 ────────────────────────────────────────────
 // Workers 沒有原生 bcrypt/argon2，用 WebCrypto 的 PBKDF2-SHA256。
-const ITERATIONS = 210_000;
+//
+// 🔴 這個數字受 Workers 免費方案的「每次呼叫 10ms CPU」硬上限約束。
+//    密碼雜湊本來就是刻意耗 CPU 的，兩者直接衝突：
+//      210,000 次 → 實測 21.6ms → 登入必定 500（曾實際發生）
+//       25,000 次 → 實測  2.4ms → 留約 7ms 餘裕給其餘處理
+//
+//    調高之前務必先實測，並確認方案是否已升級（付費方案上限 30 秒）。
+//    改動後既有的雜湊仍可驗證（迭代次數存在雜湊字串裡），登入成功時會
+//    自動以新參數重新雜湊 —— 但如果調高到超過 CPU 預算，舊雜湊會連驗證
+//    都跑不完，使用者會被鎖在外面。見 docs/08-security.md#密碼
+//    與 docs/10-cost.md#最大的風險cpu-上限
+export const ITERATIONS = 25_000;
 const KEY_LEN = 32;
 
 const b64 = (buf: ArrayBuffer | Uint8Array) =>
@@ -50,8 +61,13 @@ export async function verifyPassword(password: string, stored: string): Promise<
   return timingSafeEqual(actual, expected);
 }
 
-/** 帳號不存在時也跑一次，避免用回應時間推測帳號是否存在 */
-const DUMMY_HASH = 'pbkdf2$sha256$210000$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
+/**
+ * 帳號不存在時也跑一次，避免用回應時間推測帳號是否存在。
+ * ⚠️ 迭代次數必須跟著 ITERATIONS 走 —— 寫死舊值的話，「帳號打錯」這條路徑
+ *    會用舊的高迭代次數運算，一樣會撞破 CPU 上限。
+ */
+const DUMMY_HASH =
+  `pbkdf2$sha256$${ITERATIONS}$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=`;
 
 // ── Session ─────────────────────────────────────────────
 export const SESSION_COOKIE = 'tsurumaru_admin';
@@ -133,6 +149,17 @@ export async function login(username: string, password: string): Promise<AdminRo
   // 帳號不存在也要跑一次雜湊，讓回應時間一致
   const ok = await verifyPassword(password, admin?.password_hash ?? DUMMY_HASH);
   if (!admin || !ok) return null;
+
+  // 雜湊參數若與現行設定不同，趁手上有明文時就地升級。
+  // 這讓日後調整 ITERATIONS 不需要所有人重設密碼。
+  const storedIterations = Number(admin.password_hash.split('$')[2]);
+  if (storedIterations !== ITERATIONS) {
+    const rehashed = await hashPassword(password);
+    await env.DB.prepare('UPDATE admins SET password_hash = ? WHERE id = ?')
+      .bind(rehashed, admin.id)
+      .run();
+  }
+
   return admin;
 }
 

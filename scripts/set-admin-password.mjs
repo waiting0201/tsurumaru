@@ -27,8 +27,10 @@ if (!username || !password) {
 // 依業主決定，不設最短長度限制（2026-08-07）。空字串仍然拒絕 ——
 // 那不是「短密碼」而是「沒有密碼」。見 docs/08-security.md#密碼
 
-// 與 src/lib/auth.ts 的 hashPassword 完全相同的參數與格式
-const ITERATIONS = 210_000;
+// 必須與 src/lib/auth.ts 的 ITERATIONS 相同 —— 那邊受 Workers 免費方案的
+// 10ms CPU 上限約束（見該檔註解）。這裡設得比較高不會報錯，但產生的雜湊
+// 在正式環境會驗證不完，使用者會被鎖在外面。
+const ITERATIONS = 25_000;
 const b64 = (buf) => Buffer.from(new Uint8Array(buf)).toString('base64');
 
 const salt = crypto.getRandomValues(new Uint8Array(16));
