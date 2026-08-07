@@ -25,6 +25,16 @@
     "enabled": true
   },
 
+  // 圖片的公開網域（R2 自訂網域，已綁定到 tsurumaru-media）。
+  // 設了這個之後 photoUrl() 直接輸出 https://img.… ，圖片完全不經 Worker，
+  // 也不計入免費方案的 request 額度 —— 見 docs/10-cost.md
+  //
+  // 這不是祕密，是設定，所以放 vars 而非 secret：進版控、CI 部署自動帶上。
+  // 本機開發要用本地 R2 模擬時，在 .dev.vars 設 MEDIA_BASE_URL="" 覆蓋掉即可。
+  "vars": {
+    "MEDIA_BASE_URL": "https://img.tsurumarucorp.com"
+  },
+
   "d1_databases": [
     {
       "binding": "DB",

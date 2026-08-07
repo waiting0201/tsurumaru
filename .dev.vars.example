@@ -6,3 +6,7 @@
 
 # 後台 session cookie 的簽章金鑰（隨機長字串）
 SESSION_SECRET=""
+
+# 本機開發時清空，讓圖片改走 /media/* 由本地 R2 模擬提供。
+# 不清空的話會直接連正式的 img.tsurumarucorp.com，看不到本機上傳的圖。
+MEDIA_BASE_URL=""
