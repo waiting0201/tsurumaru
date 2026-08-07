@@ -37,18 +37,27 @@
 
 ## 最大的槓桿：把圖片移出 Worker
 
-目前 `photoUrl()` 在未設定 `MEDIA_BASE_URL` 時回傳 `/media/...`，**每張圖都算一次 Worker request**。一個顯示 8 台車的列表頁 = 1（HTML）+ 8（圖）= 9 次。
+✅ **已完成（2026-08-07）。** 車輛圖片改由 `https://img.tsurumarucorp.com`（R2 自訂網域）直接投遞，完全不經 Worker。
 
-100,000/天 ÷ 9 ≈ **每天約 11,000 次列表頁瀏覽**才會到頂。對一家車行仍然充裕，但綁定 R2 自訂網域後可以直接變成 1 次／頁：
+在此之前每張圖都算一次 Worker request，一個顯示 8 台車的列表頁 = 1（HTML）+ 8（圖）= 9 次；現在是 **1 次**。
 
-```bash
-npx wrangler r2 bucket domain add tsurumaru-media --domain=img.<正式網域>
-npx wrangler secret put MEDIA_BASE_URL     # 填 https://img.<正式網域>
-```
+設定分兩處：
+- R2 自訂網域：`wrangler r2 bucket domain add tsurumaru-media --domain=img.tsurumarucorp.com --zone-id=<zone>`
+- `MEDIA_BASE_URL`：放在 [`wrangler.jsonc`](../wrangler.jsonc) 的 `vars`（不是 secret —— 它是公開網址，該進版控讓 CI 帶上）
 
-綁定後圖片完全不經 Worker（也不計 R2 Class B，因為走 Cloudflare 快取），且只需要改 [`src/lib/media.ts`](../src/lib/media.ts) 讀取的那一個環境變數 —— 這正是當初把 URL 組裝集中在該模組的理由（[ADR-0003](adr/0003-r2-object-storage.md)）。
+程式完全沒改，`photoUrl()` 讀到變數就自動切換 —— 這正是當初把 URL 組裝集中在 [`src/lib/media.ts`](../src/lib/media.ts) 的理由（[ADR-0003](adr/0003-r2-object-storage.md)）。
 
-**前置條件：正式網域必須在 Cloudflare 上。**
+### ⚠️ 邊緣快取尚未啟用（可選的後續優化）
+
+R2 自訂網域把物件存的 `httpMetadata` 原樣送出。上傳時已設 `Cache-Control: public, max-age=31536000, immutable`，所以**瀏覽器快取與 304 條件請求都正常運作**，回訪者不會重新下載。
+
+但 Cloudflare 的**邊緣**快取仍是 `cf-cache-status: DYNAMIC` —— R2 自訂網域預設只快取部分檔案類型，要全部快取需要一條 Cache Rule。這需要 zone 層級的 Rulesets 權限，wrangler 的 OAuth 範圍不含，必須在 Dashboard 操作：
+
+> Cloudflare Dashboard → tsurumarucorp.com → **Caching** → **Cache Rules** → Create rule
+> 條件：`Hostname` equals `img.tsurumarucorp.com`
+> 動作：**Eligible for cache**，Edge TTL 選 **Use cache-control header from origin**
+
+**這是可選的。** 目前的影響只有「首次造訪該地區的訪客」多一次回源；R2 的 Class B 免費額度是 1000 萬次／月，這個站用不到零頭，且 R2 流量本身免費。
 
 ## 最大的風險：CPU 上限
 

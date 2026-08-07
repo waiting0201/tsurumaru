@@ -48,6 +48,6 @@
 | 舊網址導轉 | ✅ 7 條規則實測通過（含 query→路徑、GUID 轉小寫） |
 | CI/CD | ✅ push 到 master 自動建置、套用 migration 並部署 |
 | 管理員密碼 | ⛔ 正式環境尚未設定 —— 依計畫刻意不搬舊明碼，需用 `scripts/set-admin-password.mjs` 設定後才能登入後台 |
-| R2 公開網域 | ⬜ 未綁定 —— 未綁定前圖片由 Worker 代送 `/media/*`，綁定後設 `MEDIA_BASE_URL` 即可切換 |
+| R2 公開網域 | ✅ `img.tsurumarucorp.com` 已綁定，車輛圖片不經 Worker（邊緣快取為可選優化，見 [10](10-cost.md)） |
 | 部署 | ✅ 已上線 https://www.tsurumarucorp.com（CI 自動部署） |
 | 正式網域 | ✅ Cloudflare 託管，apex 301 導向 www，Zoho MX 未受影響 |
